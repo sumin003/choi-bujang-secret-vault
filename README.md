@@ -58,3 +58,13 @@ Vercel 프로젝트 Settings → Environment Variables의 비밀 입력란에 `S
 [AGENTS.md](AGENTS.md)를 먼저 읽히고 한 번에 한 제작 단위만 요청하세요. 2단계부터는 자료 보호를 구현할 때 `public/data.json`을 복사하는 1단계 빌드 흐름도 함께 바꿔야 합니다. 3단계 이후의 로그인, 허용 경로, 5단계의 원본 API 주소, 6단계 이후 정책 규칙은 해당 단계 원고와 계약에 맞춰 추가합니다. 비밀번호·토큰·서버 전용 키·실제 학생 기록을 코드, Git, 제출 묶음에 넣지 않습니다.
 
 `src/decider.mjs`와 `src/detect.mjs`의 로컬 시험은 반 엔진이나 운영 심판의 결과가 아닙니다. 1단계 이후 제출 묶음 계약 `aleph.defense.submission.v2`는 `scripts/bundle.mjs`에 남아 있으며, 코딩 도구가 해당 단계의 최신 배포 주소와 Git 원격을 맞춘 뒤 사용합니다.
+
+## 2단계 저장점
+
+현재 기능: 서버 API로 가상 메모 네 건 조회, 정적 data.json 제거, step 2 배포 식별 파일 생성, nosniff 헤더 설정. 서버 환경변수는 Vercel에만 저장합니다.
+
+2026-10-10 사용자 브라우저 확인: /data.json은 404, /aleph.json은 step 2 및 커밋 919429268cefbdb4428c6fbc2d3a32110dfe74f7 표시, 첫 화면 응답은 nosniff 표시. 카드 네 개 표시는 앞선 사용자 확인이며 환경변수 재배포 이후 재확인은 미기록입니다. 도구의 직접 HTTP 점검은 접근 오류로 미확인입니다. 최신 파일과 배포 자산의 네 메모 문장 검색 결과는 미확인입니다. 공개 키 요청은 심판 확인 범위입니다.
+
+현재 주소: https://choi-bujang-secret-vault-mocha.vercel.app · 저장소: https://github.com/sumin003/choi-bujang-secret-vault
+
+다시 실행: npm run build -- --local. 실제 서버 확인은 배포 주소 새로고침으로 수행합니다. 제출 묶음은 npm run bundle로 생성하며 bundle-notes.json과 artifacts/submission.json은 Git에 포함하지 않습니다. 아직 공개 API에는 로그인·권한 검증이 없으며 옛 공개 커밋과 옛 배포의 과거 노출도 남아 있습니다.
