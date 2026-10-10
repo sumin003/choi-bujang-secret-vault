@@ -16,6 +16,16 @@
     li { border: 1px solid #51667c; border-radius: 14px; padding: 17px 19px; background: #1a2a3d; }
     strong { display: block; font-size: 18px; margin-bottom: 5px; }
     li span { color: #bfd0e5; }
+    .auth-panel { margin: 24px 0; padding: 20px; border: 1px solid #51667c; border-radius: 14px; }
+    .auth-panel h2 { margin-top: 0; font-size: 22px; }
+    #login-form { display: grid; gap: 10px; }
+    input, button { font: inherit; padding: 12px; border-radius: 8px; }
+    input { width: 100%; box-sizing: border-box; background: #101a28; color: #ecf4ff; border: 1px solid #7891ac; }
+    button { border: 0; background: #8ad8df; color: #101a28; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: wait; }
+    :focus-visible { outline: 3px solid #ffe19a; outline-offset: 3px; }
+    #auth-message { font-size: 15px; margin-bottom: 0; overflow-wrap: anywhere; }
+    [hidden] { display: none !important; }
   </style>
 </head>
 <body>
@@ -24,8 +34,22 @@
     <h1>점령된 자료실</h1>
     <p>지금은 보호 장치가 없는 상태입니다. 아래 기록은 모두 실습을 위해 만든 가상 자료입니다.</p>
     <div class="notice">로그인하지 않은 방문자도 자료를 볼 수 있습니다. 공개 범위를 확인하고, 다음 제작 단계에서 접근을 차례로 막아 주세요.</div>
+    <section class="auth-panel" aria-labelledby="auth-heading">
+      <h2 id="auth-heading">자료실 로그인</h2>
+      <p id="auth-state" role="status">로그인 상태를 확인하는 중입니다.</p>
+      <form id="login-form">
+        <label for="login-email">이메일</label>
+        <input id="login-email" name="email" type="email" autocomplete="username" required>
+        <label for="login-password">비밀번호</label>
+        <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+        <button id="login-button" type="submit" disabled>로그인</button>
+      </form>
+      <button id="logout-button" type="button" hidden disabled>로그아웃</button>
+      <p id="auth-message" role="alert" aria-live="polite"></p>
+    </section>
     <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
   </main>
+  <script type="module" src="/auth.js"></script>
   <script type="module">
     const list = document.querySelector('#notes');
     try {
