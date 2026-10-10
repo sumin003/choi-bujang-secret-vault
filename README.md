@@ -2,6 +2,14 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
+## 3단계 진행: 자료 API 토큰 검증
+
+현재 /api/notes는 기존 src/verify-login.mjs의 createLoginVerifier로 Authorization 토큰을 검사합니다. 토큰이 없거나 검증에 실패하면 HTTP 401과 LOGIN_REQUIRED만 반환하고 자료를 읽지 않습니다. 브라우저가 보낸 userId·role은 사용하지 않습니다. 로그인 SDK의 세션 토큰만 요청 헤더에 보내며 로그아웃 즉시 화면의 메모를 지웁니다.
+
+aleph.config.json은 step 3이고 identityProvider에는 Supabase issuer·authenticated audience·JWKS 공개 주소만 기록했습니다. judgeIssuer는 유지했습니다. 정상 로그인은 메모 네 건을 요청할 수 있으나 사용자별 소유권 제한은 아직 구현하지 않았습니다.
+
+확인 방법: 사이트 새로고침 → A 로그인 시 메모 네 건 표시 → 로그아웃 시 메모 제거. 비로그인 /api/notes 직접 요청은 401이어야 합니다. 모의 검증에서 API 거부·허용 분기를 확인했으며 실제 A 계정과 실배포 응답 검증은 미확인입니다. 아래 1~2단계 기록은 과거 상태입니다.
+
 ## 학생이 하는 일: 세 걸음
 
 1. GitHub 계정을 만듭니다.

@@ -7,6 +7,45 @@ const state = document.querySelector('#auth-state');
 const message = document.querySelector('#auth-message');
 let busy = false;
 let signedIn = false;
+const list = document.querySelector('#notes');
+let notesVersion = 0;
+
+async function loadNotes(session) {
+  const version = ++notesVersion;
+  const show = text => {
+    const item = document.createElement('li');
+    item.textContent = text;
+    list.replaceChildren(item);
+  };
+  show(session ? '가상 자료를 불러오는 중입니다.' : '로그인 후 자료를 확인할 수 있습니다.');
+  if (!session?.access_token) return;
+  try {
+    const response = await fetch('/api/notes', {
+      cache: 'no-store',
+      headers: { Authorization: 'Bearer ' + session.access_token },
+    });
+    if (version !== notesVersion) return;
+    if (response.status === 401) {
+      show('로그인 인증에 실패했습니다. 다시 로그인해 주세요.');
+      return;
+    }
+    if (!response.ok) throw new Error();
+    const data = await response.json();
+    if (version !== notesVersion) return;
+    if (!Array.isArray(data.notes)) throw new Error();
+    list.replaceChildren(...data.notes.map(note => {
+      const item = document.createElement('li');
+      const title = document.createElement('strong');
+      const content = document.createElement('span');
+      title.textContent = note.title;
+      content.textContent = note.content;
+      item.append(title, content);
+      return item;
+    }));
+  } catch {
+    if (version === notesVersion) show('가상 자료를 읽을 수 없습니다. 잠시 후 다시 시도해 주세요.');
+  }
+}
 
 function render(session) {
   signedIn = Boolean(session?.user);
@@ -16,6 +55,7 @@ function render(session) {
   loginButton.disabled = busy;
   logoutButton.disabled = busy;
   if (signedIn) password.value = '';
+  void loadNotes(session);
 }
 
 function reason(error) {
@@ -41,7 +81,7 @@ try {
     'sb_publishable_gs5uFk92hjznNpp4O8VoOQ_qeLgPeMb',
   );
   // The SDK manages credentials, sessions and refresh tokens.
-  // Session state here only controls the UI; the notes API remains public.
+  // The server verifies the SDK token before returning any notes.
   supabase.auth.onAuthStateChange((_event, session) => render(session));
   const { data, error } = await supabase.auth.getSession();
   if (error) message.textContent = reason(error);
