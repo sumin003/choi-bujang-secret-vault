@@ -2,7 +2,24 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
-## 3단계 저장점
+## 4단계 저장점
+
+- 기존 Supabase SDK 로그인·로그아웃과 토큰 검증 도우미를 유지합니다. 메모 API는 검증된 사용자 ID로 목록·단건 읽기·수정·삭제의 owner_id를 제한합니다. 추가·수정에서 브라우저가 보낸 소유자 값은 사용하지 않습니다.
+- 기존 가상 메모 네 건을 A에 연결하고 B의 공개 가능한 시험 메모 한 건을 DB에 보존했습니다. 메모 본문과 계정 정보는 이 기록에 포함하지 않습니다.
+- public.learning_notes에 RLS 및 네 소유자 정책을 적용했습니다. SELECT·DELETE는 USING, INSERT는 WITH CHECK, UPDATE는 USING과 WITH CHECK에서 auth.uid() = owner_id를 검사합니다.
+- 적용 전후 information_schema.role_table_grants와 has_table_privilege 확인: anon은 모든 테이블 권한 없음, authenticated는 SELECT·INSERT·UPDATE·DELETE만 허용하며 TRUNCATE·REFERENCES·TRIGGER는 거부됩니다. 다른 테이블은 변경하지 않았습니다.
+- aleph.config.json의 step 4, 실제 배포 주소, Supabase issuer·authenticated audience·JWKS, GET·POST·PUT·DELETE 경로를 구현과 대조했습니다. judgeIssuer와 판정기의 starter.deny 규칙은 유지합니다.
+- 최신 API 코드의 모의 시험에서 A/B 자신의 CRUD 허용, 상대 단건 GET·PUT·DELETE 404, 소유자 위조 무시, 미로그인 목록 401 JSON을 확인했습니다. 사용자는 B에서 A UUID 조회가 거부되는 화면을 확인했습니다. 실제 배포 A/B 전체 CRUD는 미확인입니다.
+- 빌드 스크립트는 public/data.json만 제거하고 배포 시 public/aleph.json을 생성합니다. vercel.json의 전체 경로 nosniff 설정을 확인했습니다. 현재 배포의 직접 HTTP 확인은 실행 환경 접근 차단으로 미확인입니다.
+- 서버 비밀키는 RLS를 우회할 수 있으므로 API 소유자 검사를 유지해야 합니다. 최신 정적 파일·배포 자산의 네 메모 문장 검색은 미확인입니다. 옛 공개 커밋·배포에 남은 자료가 회수되었다고 단정하지 않습니다.
+- 제출 묶음은 이번 저장점에서 실행하지 않았습니다. src/attack-check.mjs는 여전히 1단계용이며 후속 제출 전 갱신이 필요합니다.
+
+현재 주소: https://choi-bujang-secret-vault-mocha.vercel.app
+다시 실행: `npm run build -- --local`. 배포 화면에서 A/B 각각 로그인 → 자기 메모 목록 → 추가 → UUID 불러오기 → 수정 → 삭제를 확인합니다. 상대 UUID의 읽기·수정·삭제는 404, 미로그인 /api/notes는 401 JSON이어야 합니다. 로그아웃하면 화면 메모가 사라져야 합니다.
+
+아래 1~3단계 내용은 당시의 작업 기록이며 현재 상태는 위 4단계 기록을 따릅니다.
+
+## 3단계 저장점 (과거 기록)
 
 - 이메일·비밀번호 로그인 및 로그아웃은 Supabase 공식 SDK를 사용합니다. 자료 API는 기존 src/verify-login.mjs로 토큰을 검사하며, 미로그인·검증 실패 시 메모 없는 401 JSON 오류를 반환합니다.
 - 로그인 사용자의 메모 목록과 UUID 기반 추가·단건 조회·수정·삭제를 구현했습니다. 새 owner_id는 서버가 검증한 사용자 ID입니다. 삭제 후 단건 조회는 404입니다.
