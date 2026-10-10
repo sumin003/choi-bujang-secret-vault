@@ -49,11 +49,11 @@ export async function handleNotes(req, res, id) {
     const base = new URL(url);
     if (base.protocol !== 'https:' || base.username || base.password) throw new Error();
     const endpoint = new URL('/rest/v1/learning_notes', base);
-    const params = new URLSearchParams({ select: 'id:note_id,title,body:content' });
+    const params = new URLSearchParams({ select: 'id:note_id,title,body:content,owner_id' });
     if (id !== null) params.set('note_id', 'eq.' + id);
-    // Stage 3: list is scoped, but single-note operations intentionally lack ownership checks.
+    // Apply ownership in the same database statement as reads, updates and deletes.
+    if (req.method !== 'POST') params.set('owner_id', 'eq.' + identity.userId);
     if (req.method === 'GET' && id === null) {
-      params.set('owner_id', 'eq.' + identity.userId);
       params.set('order', 'created_at.asc,id.asc');
     }
     endpoint.search = params;
@@ -66,7 +66,7 @@ export async function handleNotes(req, res, id) {
     } else if (method === 'PUT') {
       method = 'PATCH';
       // Ignore browser-supplied owner_id, userId and role.
-      payload = { title: input.title, content: input.body };
+      payload = { title: input.title, content: input.body, owner_id: identity.userId };
     }
     if (payload) headers['Content-Type'] = 'application/json';
     const response = await fetch(endpoint, {
@@ -77,6 +77,7 @@ export async function handleNotes(req, res, id) {
     if (!response.ok) throw new Error();
     const rows = await response.json();
     if (!Array.isArray(rows)) throw new Error();
+    if (rows.some(row => row.owner_id !== identity.userId)) throw new Error();
     if (id !== null && rows.length === 0) return res.status(404).json({ error: 'NOTE_NOT_FOUND' });
     if (req.method === 'DELETE') return res.status(204).end();
     const notes = rows.map(row => {
