@@ -19,13 +19,19 @@
     .auth-panel { margin: 24px 0; padding: 20px; border: 1px solid #51667c; border-radius: 14px; }
     .auth-panel h2 { margin-top: 0; font-size: 22px; }
     #login-form { display: grid; gap: 10px; }
-    input, button { font: inherit; padding: 12px; border-radius: 8px; }
-    input { width: 100%; box-sizing: border-box; background: #101a28; color: #ecf4ff; border: 1px solid #7891ac; }
+    input, textarea, button { font: inherit; padding: 12px; border-radius: 8px; }
+    input, textarea { width: 100%; box-sizing: border-box; background: #101a28; color: #ecf4ff; border: 1px solid #7891ac; }
     button { border: 0; background: #8ad8df; color: #101a28; cursor: pointer; }
     button:disabled { opacity: .6; cursor: wait; }
     :focus-visible { outline: 3px solid #ffe19a; outline-offset: 3px; }
     #auth-message { font-size: 15px; margin-bottom: 0; overflow-wrap: anywhere; }
     [hidden] { display: none !important; }
+    #note-form { display: grid; gap: 10px; }
+    textarea { min-height: 120px; resize: vertical; }
+    .note-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    li span { white-space: pre-wrap; overflow-wrap: anywhere; }
+    li small { display: block; margin-top: 10px; overflow-wrap: anywhere; color: #bfd0e5; }
+    #note-message { overflow-wrap: anywhere; }
   </style>
 </head>
 <body>
@@ -46,6 +52,24 @@
       </form>
       <button id="logout-button" type="button" hidden disabled>로그아웃</button>
       <p id="auth-message" role="alert" aria-live="polite"></p>
+    </section>
+    <section id="note-editor" class="auth-panel" hidden aria-labelledby="note-heading">
+      <h2 id="note-heading">내 가상 메모</h2>
+      <form id="note-form">
+        <label for="note-id">메모 UUID (새 메모는 비워두면 자동 생성)</label>
+        <input id="note-id" type="text" autocomplete="off">
+        <button id="load-note" type="button">ID로 메모 불러오기</button>
+        <label for="note-title">제목</label>
+        <input id="note-title" type="text" maxlength="200" required>
+        <label for="note-body">내용</label>
+        <textarea id="note-body" maxlength="10000" required></textarea>
+        <div class="note-actions">
+          <button id="save-note" type="submit">메모 추가</button>
+          <button id="new-note" type="button">새 메모 작성</button>
+          <button id="refresh-notes" type="button">목록 새로고침</button>
+        </div>
+      </form>
+      <p id="note-message" role="status" aria-live="polite"></p>
     </section>
     <ul id="notes" aria-live="polite"><li>로그인 후 자료를 확인할 수 있습니다.</li></ul>
   </main>

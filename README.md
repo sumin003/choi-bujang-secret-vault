@@ -2,7 +2,27 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
-## 3단계 진행: 자료 API 토큰 검증
+## 3단계 진행: 가상 메모 CRUD
+
+로그인 사용자는 화면에서 가상 메모를 추가·불러오기·수정·삭제할 수 있습니다. 목록 응답은 서버가 검증한 사용자 ID의 메모 배열이며 새 메모 owner_id도 그 ID로 저장합니다. 요청의 owner_id·userId·role은 믿지 않습니다. 새 메모가 없다면 빈 목록이 정상입니다. 기존 네 자료는 원래 소유자 값과 숫자 ID를 보존했습니다.
+
+| 경로 | 계약 |
+| --- | --- |
+| GET /api/notes | 로그인 사용자의 메모 배열 [{id,title,body}] |
+| POST /api/notes | {id?,title,body}, UUID 생략 시 서버 생성, 201 {id} |
+| GET /api/notes/:id | 200 {id,title,body}, 없거나 삭제된 UUID는 404 |
+| PUT /api/notes/:id | {title,body}, 200 {id,title,body} |
+| DELETE /api/notes/:id | 삭제 성공 204, 이후 GET 404 |
+
+실제 메서드·경로를 aleph.config.json의 allowedRoutes에 기록했습니다. UUID는 기존 숫자 PK를 바꾸지 않고 learning_notes.note_id에 저장하며 API body는 기존 content 열에 연결합니다. docs/notes-api-schema.sql은 적용된 스키마 변경입니다. 기존 로그인 검증 도우미와 RLS는 변경하지 않았습니다.
+
+**4단계에서 고칠 허점:** 단건 GET·PUT·DELETE는 로그인만 검사하고 소유자를 검사하지 않습니다. B는 A의 UUID를 알면 A의 메모를 읽거나 수정·삭제할 수 있습니다. 목록을 사용자별로 제한하는 것만으로 단건 소유권이 보호되지는 않습니다.
+
+검증: API 경계 모의 시험에서 인증 거부·서버 owner_id·UUID 생성·단건 조회/수정/삭제·삭제 후 404·B→A 수정을 확인했습니다. DB UUID 추가 후 기존 네 건 보존과 고유 UUID를 확인했습니다. DB CRUD 트랜잭션 시험은 도구 오류로 미확인이며 후속 조회는 기존 네 건과 시험 자료 0건입니다. 실제 A/B 계정 및 실배포 CRUD 시험은 미확인입니다.
+
+실행 명령: npm run build -- --local. 배포 화면에서 로그인 → 제목·내용 입력 → 메모 추가 → 수정 → 수정 저장 → 삭제를 확인하세요. 삭제된 UUID를 ID로 불러오면 없는 메모 안내가 나와야 합니다. 로그인하지 않은 요청은 401이어야 합니다.
+
+## 3단계 진행: 자료 API 토큰 검증 (이전 작업 기록)
 
 현재 /api/notes는 기존 src/verify-login.mjs의 createLoginVerifier로 Authorization 토큰을 검사합니다. 토큰이 없거나 검증에 실패하면 HTTP 401과 LOGIN_REQUIRED만 반환하고 자료를 읽지 않습니다. 브라우저가 보낸 userId·role은 사용하지 않습니다. 로그인 SDK의 세션 토큰만 요청 헤더에 보내며 로그아웃 즉시 화면의 메모를 지웁니다.
 

@@ -16,7 +16,7 @@ test('notes API rejects missing or invalid tokens without reading notes', async 
     process.env.SUPABASE_URL = 'https://cysbomadvuwrqsteohuq.supabase.co';
     process.env.SUPABASE_SECRET_KEY = 'test-only-placeholder';
     globalThis.fetch = async () => { requests++; throw new Error('unexpected request'); };
-    await handler({ method: 'POST' }, res);
+    await handler({ method: 'DELETE' }, res);
     assert.equal(status, 405);
     for (const authorization of [undefined, 'invalid', 'Bearer invalid']) {
       await handler({ method: 'GET', headers: { authorization },

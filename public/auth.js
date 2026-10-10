@@ -10,6 +10,70 @@ let signedIn = false;
 const list = document.querySelector('#notes');
 let notesVersion = 0;
 
+const editor = document.querySelector('#note-editor');
+const noteForm = document.querySelector('#note-form');
+const noteId = document.querySelector('#note-id');
+const noteTitle = document.querySelector('#note-title');
+const noteBody = document.querySelector('#note-body');
+const noteMessage = document.querySelector('#note-message');
+const saveNote = document.querySelector('#save-note');
+const newNote = document.querySelector('#new-note');
+const loadNote = document.querySelector('#load-note');
+const refreshNotes = document.querySelector('#refresh-notes');
+let currentSession = null;
+let editingId = null;
+let writing = false;
+
+function noteReason(status) {
+  return ({ 400: 'UUID와 제목·내용을 확인해 주세요.', 401: '다시 로그인해 주세요.',
+    404: '메모가 없거나 이미 삭제되었습니다.', 409: '이미 사용 중인 UUID입니다.',
+    415: '요청 형식이 올바르지 않습니다.' })[status]
+    ?? '메모 요청을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+}
+
+function resetEditor() {
+  editingId = null;
+  noteForm.reset();
+  saveNote.textContent = '메모 추가';
+}
+
+async function requestNote(path, method = 'GET', input) {
+  const token = currentSession?.access_token;
+  if (!token) throw new Error('로그인 후 이용해 주세요.');
+  const headers = { Authorization: 'Bearer ' + token };
+  if (input) headers['Content-Type'] = 'application/json';
+  const response = await fetch(path, { method, headers, cache: 'no-store',
+    body: input ? JSON.stringify(input) : undefined });
+  if (token !== currentSession?.access_token) throw new Error('로그인 상태가 변경되었습니다.');
+  if (!response.ok) throw new Error(noteReason(response.status));
+  return response.status === 204 ? null : response.json();
+}
+
+async function editNote(id) {
+  try {
+    const note = await requestNote('/api/notes/' + encodeURIComponent(id));
+    editingId = note.id;
+    noteId.value = note.id;
+    noteTitle.value = note.title;
+    noteBody.value = note.body;
+    saveNote.textContent = '수정 저장';
+    noteMessage.textContent = '메모를 불러왔습니다.';
+    noteTitle.focus();
+  } catch (error) { noteMessage.textContent = error.message; }
+}
+
+async function deleteNote(id) {
+  if (writing || !confirm('이 가상 메모를 삭제할까요?')) return;
+  writing = true;
+  try {
+    await requestNote('/api/notes/' + encodeURIComponent(id), 'DELETE');
+    if (editingId === id) resetEditor();
+    noteMessage.textContent = '삭제했습니다.';
+    await loadNotes(currentSession);
+  } catch (error) { noteMessage.textContent = error.message; }
+  finally { writing = false; }
+}
+
 async function loadNotes(session) {
   const version = ++notesVersion;
   const show = text => {
@@ -20,35 +84,64 @@ async function loadNotes(session) {
   show(session ? '가상 자료를 불러오는 중입니다.' : '로그인 후 자료를 확인할 수 있습니다.');
   if (!session?.access_token) return;
   try {
-    const response = await fetch('/api/notes', {
-      cache: 'no-store',
-      headers: { Authorization: 'Bearer ' + session.access_token },
-    });
+    const notes = await requestNote('/api/notes');
     if (version !== notesVersion) return;
-    if (response.status === 401) {
-      show('로그인 인증에 실패했습니다. 다시 로그인해 주세요.');
-      return;
-    }
-    if (!response.ok) throw new Error();
-    const data = await response.json();
-    if (version !== notesVersion) return;
-    if (!Array.isArray(data.notes)) throw new Error();
-    list.replaceChildren(...data.notes.map(note => {
+    if (!Array.isArray(notes)) throw new Error('자료 형식이 올바르지 않습니다.');
+    if (!notes.length) { show('내 메모가 없습니다. 새 가상 메모를 추가해 주세요.'); return; }
+    list.replaceChildren(...notes.map(note => {
       const item = document.createElement('li');
       const title = document.createElement('strong');
       const content = document.createElement('span');
+      const id = document.createElement('small');
+      const actions = document.createElement('div');
       title.textContent = note.title;
-      content.textContent = note.content;
-      item.append(title, content);
+      content.textContent = note.body;
+      id.textContent = 'ID: ' + note.id;
+      actions.className = 'note-actions';
+      for (const [label, action] of [['수정', () => editNote(note.id)], ['삭제', () => deleteNote(note.id)]]) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = label;
+        button.addEventListener('click', action);
+        actions.append(button);
+      }
+      item.append(title, content, id, actions);
       return item;
     }));
-  } catch {
-    if (version === notesVersion) show('가상 자료를 읽을 수 없습니다. 잠시 후 다시 시도해 주세요.');
+  } catch (error) {
+    if (version === notesVersion) show(error.message);
   }
 }
 
+noteForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (writing) return;
+  writing = true;
+  saveNote.disabled = true;
+  try {
+    const input = { title: noteTitle.value, body: noteBody.value };
+    if (!editingId && noteId.value.trim()) input.id = noteId.value.trim();
+    const result = await requestNote(editingId ? '/api/notes/' + encodeURIComponent(editingId) : '/api/notes',
+      editingId ? 'PUT' : 'POST', input);
+    noteMessage.textContent = (editingId ? '수정했습니다. ID: ' : '추가했습니다. ID: ') + result.id;
+    resetEditor();
+    await loadNotes(currentSession);
+  } catch (error) { noteMessage.textContent = error.message; }
+  finally { writing = false; saveNote.disabled = false; }
+});
+newNote.addEventListener('click', () => {
+  resetEditor(); noteMessage.textContent = ''; noteTitle.focus();
+});
+loadNote.addEventListener('click', () => {
+  if (!writing) void editNote(noteId.value.trim());
+});
+refreshNotes.addEventListener('click', () => void loadNotes(currentSession));
+
 function render(session) {
+  currentSession = session;
   signedIn = Boolean(session?.user);
+  editor.hidden = !signedIn;
+  if (!signedIn) { resetEditor(); noteMessage.textContent = ''; }
   state.textContent = signedIn ? '로그인되어 있습니다.' : '로그아웃 상태입니다.';
   form.hidden = signedIn;
   logoutButton.hidden = !signedIn;
