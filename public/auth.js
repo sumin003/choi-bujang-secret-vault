@@ -169,10 +169,26 @@ function reason(error) {
 
 try {
   const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.117.2');
-  const supabase = createClient(
-    'https://cysbomadvuwrqsteohuq.supabase.co',
-    'sb_publishable_gs5uFk92hjznNpp4O8VoOQ_qeLgPeMb',
-  );
+  const supabase = createClient(location.origin, 'server-auth-relay', {
+    auth: { storageKey: 'sb-cysbomadvuwrqsteohuq-auth-token' },
+    global: {
+      fetch: (input, init) => {
+        const url = new URL(typeof input === 'string' ? input : input.url ?? String(input));
+        const action = url.pathname.replace('/auth/v1/', '');
+        if (url.origin !== location.origin || !['token', 'logout', 'user'].includes(action))
+          throw new Error('지원하지 않는 인증 요청입니다.');
+        const target = new URL('/api/auth', location.origin);
+        target.searchParams.set('action', action);
+        if (url.searchParams.has('grant_type'))
+          target.searchParams.set('grant_type', url.searchParams.get('grant_type'));
+        const headers = new Headers(init?.headers);
+        headers.delete('apikey');
+        if (headers.get('Authorization') === 'Bearer server-auth-relay')
+          headers.delete('Authorization');
+        return fetch(target, { ...init, headers, cache: 'no-store', redirect: 'error' });
+      },
+    },
+  });
   // The SDK manages credentials, sessions and refresh tokens.
   // The server verifies the SDK token before returning any notes.
   supabase.auth.onAuthStateChange((_event, session) => render(session));
