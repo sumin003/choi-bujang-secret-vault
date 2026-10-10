@@ -2,6 +2,18 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
+## 3단계 저장점
+
+- 이메일·비밀번호 로그인 및 로그아웃은 Supabase 공식 SDK를 사용합니다. 자료 API는 기존 src/verify-login.mjs로 토큰을 검사하며, 미로그인·검증 실패 시 메모 없는 401 JSON 오류를 반환합니다.
+- 로그인 사용자의 메모 목록과 UUID 기반 추가·단건 조회·수정·삭제를 구현했습니다. 새 owner_id는 서버가 검증한 사용자 ID입니다. 삭제 후 단건 조회는 404입니다.
+- step은 3이며 실제 저장소·배포 주소, Supabase 발급자·대상·JWKS 주소와 GET·POST·PUT·DELETE 경로를 설정과 대조했습니다. judgeIssuer 및 기존 판정기 starter.deny 규칙은 유지합니다.
+- 기존 가상 메모 네 건의 소유자를 A로 바꾸거나 A 목록에 강제로 표시하는 작업은 이번 저장점에 포함하지 않습니다. 기존 DB 자료는 보존하며 원래 소유자에 맞춰 목록을 표시합니다.
+- 단건 소유자 검사는 아직 없습니다. B가 A의 UUID를 알면 조회·수정·삭제할 수 있으며 4단계에서 보완합니다. 옛 공개 커밋·배포의 과거 노출도 해소되었다고 단정하지 않습니다.
+- API·화면 모의 시험과 DB UUID 보존 확인을 수행했습니다. 실제 A/B 계정의 전체 CRUD와 현재 배포 응답·메모 문장 검색은 미확인입니다. src/attack-check.mjs는 아직 1단계용이며 제출 묶음은 생성하지 않았습니다.
+
+현재 주소: https://choi-bujang-secret-vault-mocha.vercel.app
+다시 실행: `npm run build -- --local`. 화면 새로고침 → 로그인 → 새 가상 메모 추가 → 수정 → 삭제 순서로 확인합니다. 미로그인 /api/notes는 401 JSON, 삭제된 UUID의 GET은 404여야 합니다. /aleph.json 생성과 nosniff 설정은 유지합니다.
+
 ## 3단계 진행: 가상 메모 CRUD
 
 로그인 사용자는 화면에서 가상 메모를 추가·불러오기·수정·삭제할 수 있습니다. 목록 응답은 서버가 검증한 사용자 ID의 메모 배열이며 새 메모 owner_id도 그 ID로 저장합니다. 요청의 owner_id·userId·role은 믿지 않습니다. 새 메모가 없다면 빈 목록이 정상입니다. 기존 네 자료는 원래 소유자 값과 숫자 ID를 보존했습니다.
@@ -26,9 +38,9 @@
 
 현재 /api/notes는 기존 src/verify-login.mjs의 createLoginVerifier로 Authorization 토큰을 검사합니다. 토큰이 없거나 검증에 실패하면 HTTP 401과 LOGIN_REQUIRED만 반환하고 자료를 읽지 않습니다. 브라우저가 보낸 userId·role은 사용하지 않습니다. 로그인 SDK의 세션 토큰만 요청 헤더에 보내며 로그아웃 즉시 화면의 메모를 지웁니다.
 
-aleph.config.json은 step 3이고 identityProvider에는 Supabase issuer·authenticated audience·JWKS 공개 주소만 기록했습니다. judgeIssuer는 유지했습니다. 정상 로그인은 메모 네 건을 요청할 수 있으나 사용자별 소유권 제한은 아직 구현하지 않았습니다.
+aleph.config.json은 step 3이고 identityProvider에는 Supabase issuer·authenticated audience·JWKS 공개 주소만 기록했습니다. judgeIssuer는 유지했습니다. 현재 목록은 로그인 사용자 소유 메모만 반환하며, 단건 소유자 검사는 아직 구현하지 않았습니다.
 
-확인 방법: 사이트 새로고침 → A 로그인 시 메모 네 건 표시 → 로그아웃 시 메모 제거. 비로그인 /api/notes 직접 요청은 401이어야 합니다. 모의 검증에서 API 거부·허용 분기를 확인했으며 실제 A 계정과 실배포 응답 검증은 미확인입니다. 아래 1~2단계 기록은 과거 상태입니다.
+확인 방법: 사이트 새로고침 → A 로그인 시 A 소유 메모 목록 표시 → 로그아웃 시 메모 제거. 비로그인 /api/notes 직접 요청은 401이어야 합니다. 모의 검증에서 API 거부·허용 분기를 확인했으며 실제 A 계정과 실배포 응답 검증은 미확인입니다. 아래 1~2단계 기록은 과거 상태입니다.
 
 ## 학생이 하는 일: 세 걸음
 
