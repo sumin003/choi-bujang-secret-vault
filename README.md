@@ -2,13 +2,16 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
-## 5단계 진행: 서버 요청 통합
+## 5단계 저장점
 
 메모 CRUD는 기존 서버 함수와 로그인·소유자 검사를 유지합니다. public.learning_notes의 PUBLIC·anon·authenticated 직접 권한을 회수했고 service_role 권한과 네 RLS 정책을 유지했습니다. originalApiUrl에는 쿼리 없는 원본 HTTPS 경로를 기록했습니다. step은 5이고 allowedRoutes의 메모 GET·POST·PUT·DELETE 경로와 nosniff 설정은 유지합니다.
 
 화면에는 Supabase 공개 키가 없습니다. 공식 SDK의 로그인·세션 갱신·사용자 확인·로그아웃 요청은 /api/auth 서버 함수를 거치며 서버가 환경변수의 SUPABASE_URL과 SUPABASE_SECRET_KEY를 사용합니다. SDK가 세션을 관리하며 비밀번호나 JWT를 직접 생성하지 않습니다. 서버 키와 상위 서버 오류 원문은 응답·로그에 넣지 않습니다.
 
-다시 실행: `npm run build -- --local`. 배포 후 로그인 → 자기 메모 CRUD → 새로고침 → 로그아웃을 확인하세요. 틀린 비밀번호는 화면 오류, 상대 메모는 404, 미로그인 메모 요청은 401 JSON이어야 합니다. 로그인 실패가 새 서버 경로 때문에 발생하면 이 로그인 변경만 되돌립니다. 실제 계정의 배포 로그인·CRUD는 미확인이고 모의 검증 결과와 구분합니다.
+다시 실행: `npm run build -- --local`. 배포 후 로그인 → 자기 메모 CRUD → 새로고침 → 로그아웃을 확인하세요. 틀린 비밀번호는 화면 오류, 상대 메모는 404, 미로그인 메모 요청은 401 JSON이어야 합니다. 로그인 실패가 새 서버 경로 때문에 발생하면 이 로그인 변경만 되돌립니다. 2026-10-11 사용자 브라우저 확인: 실제 배포에서 메모 읽기·추가·수정·삭제가 정상 동작함을 확인했습니다. 이 결과는 사용자 확인이며 도구의 모의 검증과 구분합니다.
+
+
+저장점 확인: step 5, 메모 allowedRoutes 5개, originalApiUrl의 쿼리 없는 HTTPS 경로, Supabase identityProvider와 기존 judgeIssuer를 확인했습니다. Auth 중계와 화면 세션·CRUD·로그아웃 모의 검증은 통과했고 앞선 코드 변경 배포의 READY를 확인했습니다. 현재 배포의 보안 헤더·aleph.json 직접 응답과 정적 메모 문장 검색은 도구로 재확인하지 못했습니다. src/attack-check.mjs는 아직 1단계용이며 npm run bundle은 실행하지 않았습니다. 아래 이전 단계의 미확인 기록은 당시 상태이며 현재 CRUD 확인 결과는 위 사용자 확인 기록을 따릅니다.
 
 ## 4단계 저장점 (과거 기록)
 
