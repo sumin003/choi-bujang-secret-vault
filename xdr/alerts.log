@@ -272,3 +272,29 @@
 {"at":"2026-10-12T08:24:12.412Z","mode":"isolated_learning_replay","moduleKey":"brute-force","groupId":"b128e3fed34fb1a0cd5ef803bd42ae9f3e324b69346e3fd73626eb85e0c9397c","alertIds":["bf-18"],"failures":8,"action":"alert","confidence":0.56,"pattern":"같은 출발 주소의 짧은 시간 로그인 실패 연속","suppression":null}
 {"at":"2026-10-12T08:24:12.412Z","mode":"isolated_learning_replay","moduleKey":"brute-force","groupId":"6c4be1742a5d153f5627ac2c18a13ceb32740e2960ffb77551810e03567193b4","alertIds":["bf-19"],"failures":3,"action":"alert","confidence":0.53,"pattern":"같은 출발 주소의 짧은 시간 로그인 실패 연속","suppression":null}
 {"at":"2026-10-12T08:24:12.412Z","mode":"isolated_learning_replay","moduleKey":"brute-force","groupId":"069c48f15fc1fe85578caf3f559122abd5e21d4cf275bf671b42e3c8ef81c393","alertIds":["bf-22"],"failures":1,"action":"record","confidence":0.2,"pattern":"같은 출발 주소의 짧은 시간 로그인 실패 연속","suppression":null}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-01","action":"block","confidence":0.96,"pattern":"요청 인자의 SQL 주입 형태","ruleState":"expired_or_unusable"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-02","action":"block","confidence":0.96,"pattern":"요청 인자의 스크립트 주입 형태","ruleState":"expired_or_unusable"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-03","action":"block","confidence":0.96,"pattern":"상위 경로 이동 반복","ruleState":"expired_or_unusable"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-04","action":"block","confidence":0.96,"pattern":"요청 인자의 SQL 주입 형태","ruleState":"expired_or_unusable"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-05","action":"block","confidence":0.96,"pattern":"요청 인자의 SQL 주입 형태 · 요청 인자의 스크립트 주입 형태","ruleState":"expired_or_unusable"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-06","action":"block","confidence":0.96,"pattern":"요청 인자의 명령 주입 형태","ruleState":"expired_or_unusable"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-07","action":"block","confidence":0.96,"pattern":"상위 경로 이동 반복","ruleState":"expired_or_unusable"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-08","action":"block","confidence":0.96,"pattern":"요청 인자의 SQL 주입 형태","ruleState":"expired_or_unusable"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-09","action":"alert","confidence":0.52,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-10","action":"alert","confidence":0.52,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-11","action":"alert","confidence":0.52,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-12","action":"alert","confidence":0.52,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-13","action":"alert","confidence":0.52,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-14","action":"alert","confidence":0.52,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-15","action":"alert","confidence":0.52,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-16","action":"alert","confidence":0.52,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-17","action":"alert","confidence":0.52,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-18","action":"record","confidence":0,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-19","action":"record","confidence":0,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-20","action":"record","confidence":0,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-21","action":"record","confidence":0,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-22","action":"record","confidence":0,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-23","action":"record","confidence":0,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-24","action":"record","confidence":0,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-25","action":"record","confidence":0,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
+{"at":"2026-10-12T13:32:07.825Z","mode":"live","moduleKey":"web-injection","alertId":"wi-26","action":"record","confidence":0,"pattern":"패턴 일치 없음","ruleState":"not_candidate"}
