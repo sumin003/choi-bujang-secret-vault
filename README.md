@@ -4,22 +4,28 @@
 
 ## 보너스 xdr-01 저장점
 
-2026-10-12 `npm run xdr:run -- brute-force`를 다시 실행해 result.json을 재생성했습니다. 경보 28건의 counts는 block 10 · alert 9 · record 9이며 정상 이벤트 bf-20~bf-28의 block은 0건입니다. 실행 오류는 없었습니다.
+2026-10-12 `npm run xdr:run -- brute-force`를 다시 실행해 result.json을 갱신했습니다. block 10 · alert 9 · record 9이며 정상 이벤트 9건 중 block은 0건입니다.
 
-독립형 경보 판정, 주소·계정별 집계, 만료형 거부 규칙, 공유 주소 보호와 추가 검사 모듈을 보존합니다. 로그인·메모 API의 XDR 검사 연결은 앞선 커밋 560bfd0a06be9846cbf8753800447fd636464576에 포함되며 Vercel 배포 READY를 확인했습니다. 기존 로그인·소유자 검사와 ZTNA 기본 규칙은 유지합니다. 현재 배포용 활성 거부 규칙은 0건이고, 실제 배포 응답·실제 공격 차단·외부 수업 ZTNA 엔진 연결은 확인하지 않았습니다. 학습용 결과를 운영 차단이나 심판 통과 증거로 기록하지 않습니다.
+src/decider.mjs에 엔진의 18개 항목 요청 계약, 등록 기기, 허용 메모 경로, 신원 필드 형식, 요청 시각 및 세션 확인 형식이 정상일 때만 허용하는 verified_request.allow 규칙을 추가했습니다. 기존 starter.deny는 조건 불충족 요청의 거부 규칙으로 보존했습니다. 요청 본문의 userId·role·IP처럼 계약 밖의 필드는 거부합니다. 새 허용 규칙은 이번 사용자 승인에 따라 추가했으며 XDR 자체가 허용을 대신하지 않습니다.
 
-다시 실행: `npm run xdr:run -- brute-force`. 정상 이벤트는 record여야 하며 result.json의 counts와 판정 배열의 건수가 같아야 합니다.
+connected-decider.mjs는 실제 src/decider.mjs의 기본 판단에 XDR 거부 검사만 추가합니다. replay.mjs의 가짜 허용 판정기를 제거하고 실제 기본 판정기 코드로 요청을 검사합니다. 출발 주소는 시험의 별도 서버 연결 문맥에만 두며 18개 항목 요청에 추가하지 않습니다. 응답은 다섯 항목이고 RULE_IDS에 구현된 세 규칙만 기록했습니다. 거부 사유는 기존 starter_not_ready, 정상 허용은 approved를 사용합니다.
+
+실제 기본 판정기를 사용한 로컬 재생 결과: 공격 10건 거부 · 애매한 시도 9건 통과 및 알림 · 정상 9건 통과. 만료 후 해제, 기존 거부 유지, 미등록 기기·허용되지 않은 경로·오래된 요청·추가 신원 필드 거부, 공유 주소 보호, 원본 경보 보존을 확인했습니다. 관련 시험 10건이 통과했습니다. 외부 연결은 이번 완료 기준에 포함하지 않습니다. 학습용 재생을 운영 공격 차단이나 심판 통과로 기록하지 않습니다.
+
+로그인·메모 API의 추가 XDR 검사 연결도 유지합니다. 배포용 활성 규칙은 0건이며 시험 규칙은 임시 경로에서만 사용합니다. 기존 로그인·소유자 검사와 DB 자료는 변경하지 않았습니다.
+
+다시 실행: `npm run xdr:run -- brute-force` / 연결 검사: `node xdr/brute-force/replay.mjs` / 관련 시험: `node --test test/xdr-decider.test.mjs test/xdr-gate.test.mjs test/xdr-run.test.mjs`.
 
 ## XDR 보너스: 로그인 공격 분류와 서버 추가 검사
 
 - xdr/brute-force/read-alerts.mjs는 원본 경보 28건에서 다섯 항목만 추출하고 비밀값처럼 보이는 필드를 가립니다. 원본 경보는 변경하지 않습니다.
 - patterns.json의 MITRE T1110 근거를 독립형 decide.mjs 상수로 복사했습니다. 파일 입출력·네트워크·import 없이 block/alert/record와 확신도·패턴 이름을 반환합니다.
 - respond.mjs는 주소·계정별 3분 시간창으로 중복 경보 번호를 제외해 집계한 뒤 같은 decide 함수를 호출합니다. 입력 count는 겹치지 않는 실패 묶음이어야 하며 누적 집계 경보는 먼저 정규화해야 합니다. 명확한 후보만 15분 만료형 IP 거부 규칙으로 저장하고 근거 경보 번호를 기록합니다. 정상 로그인 근거가 있는 공유 주소는 차단 대신 알림으로 낮춥니다.
-- src/xdr-gate.mjs를 로그인 /api/auth와 메모 /api/notes 및 /api/notes/:id 서버 경로에 연결했습니다. Vercel 환경의 x-vercel-forwarded-for 주소만 사용하며 브라우저 본문·일반 전달 헤더를 주소 근거로 사용하지 않습니다. 로컬에서는 TCP 연결 주소만 사용합니다. 기존 로그인·소유자 검사와 src/decider.mjs 규칙은 유지합니다.
+- src/xdr-gate.mjs를 로그인 /api/auth와 메모 /api/notes 및 /api/notes/:id 서버 경로에 연결했습니다. Vercel 환경의 x-vercel-forwarded-for 주소만 사용하며 브라우저 본문·일반 전달 헤더를 주소 근거로 사용하지 않습니다. 로컬에서는 TCP 연결 주소만 사용합니다. 기존 로그인·소유자 검사를 유지하며, src/decider.mjs에는 정상 허용 규칙을 추가하고 기존 starter.deny를 조건 불충족 요청의 거부 규칙으로 보존합니다.
 - 운영용 live 규칙만 서버가 검사합니다. 차단 시 403 JSON XDR_BLOCKED, 정상 주소는 기존 서버 검사로 진행하며, 활성 규칙이 없으면 X-XDR-Check: no-active-rules 응답 헤더를 붙입니다. 시험용 replay 규칙은 배포에 포함하지 않습니다.
 - 현재 가상 경보는 과거 시각이므로 배포용 deny-rules.json은 rules: []입니다. 규칙 파일은 배포에 포함되는 스냅샷입니다. 새로운 규칙을 배포에 반영하려면 신뢰할 수 있는 경보로 respond를 실행하고 검토 후 재배포해야 합니다. 실행 중인 Vercel의 파일을 수정하거나 Wazuh 실시간 수집이 연결됐다고 기록하지 않습니다.
 - 로컬 검증: 읽기 28건=28행, result.json block 10/alert 9/record 9, 정상 오차단 0건. 재생 연결에서 공격 10건 거부·애매 9건 및 정상 9건 통과, 공유 주소 보호·만료 해제 통과. 서버 경로 시험에서 차단 주소가 Auth/DB에 도달하지 않고 정상 CRUD와 미로그인 401이 유지됨을 확인했습니다. 이 결과는 가상 입력과 상위 서버 대체 시험이며 실제 공격 트래픽 차단 증거가 아닙니다.
-- 외부 수업 운영 ZTNA 엔진은 별도입니다. connected-decider.mjs는 기존 판정기 추가 검사 부품이지만, 현재 starter.deny 기본 판정기와 외부 엔진의 출발 주소 제공 연결은 아직 구현되지 않았습니다. 자료실 API의 실제 검사 경로와 구분합니다.
+- connected-decider.mjs는 실제 기본 판정기의 정상 허용을 유지하고 공격 주소만 추가로 거부합니다. 실제 기본 판정기 연결 재생이 통과했으며, 외부 연결은 이번 과제의 완료 기준에서 제외합니다.
 
 실행: `npm run xdr:run -- brute-force` / 연결 재생: `node xdr/brute-force/replay.mjs` / 서버 검사 시험: `node --test test/xdr-gate.test.mjs`.
 배포 확인: 브라우저 개발자 도구 Network에서 로그인·메모 API의 응답 헤더 X-XDR-Check를 확인합니다. 메모 요청 헤더의 토큰과 로그인 본문을 공유하지 마세요.

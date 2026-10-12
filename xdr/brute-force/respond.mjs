@@ -53,7 +53,7 @@ export async function respond({fixture: supplied, now=Date.now(), mode='live',
 
 // The trusted server integration supplies an IP from its transport context.
 // Never derive it from the request body, raw X-Forwarded-For, account or browser input.
-export function withXdrDenies(baseDecide,{getVerifiedSource,denyReasonCode,
+export function withXdrDenies(baseDecide,{getVerifiedSource,denyReasonCode,denyRuleId,
   now=()=>Date.now(),mode='live',loadRules=async()=>{
     try{return JSON.parse(await readFile(rulesUrl,'utf8')).rules;}
     catch(e){if(e.code==='ENOENT')return [];throw Error('XDR 규칙을 읽을 수 없습니다.');}
@@ -72,7 +72,7 @@ export function withXdrDenies(baseDecide,{getVerifiedSource,denyReasonCode,
       &&Array.isArray(r.alertIds)&&r.alertIds.length>0&&r.alertIds.every(idOK)
       &&Date.parse(r.createdAt)<=at&&Date.parse(r.expiresAt)>at);
     return match?{schema:'aleph.decision.v1',requestId:request.requestId,decision:'deny',
-      reasonCode:denyReasonCode,ruleIds:[match.ruleId]}:baseline;
+      reasonCode:denyReasonCode,ruleIds:[denyRuleId??match.ruleId]}:baseline;
   };
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){

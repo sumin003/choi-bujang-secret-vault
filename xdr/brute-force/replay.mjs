@@ -2,7 +2,8 @@ import {readFile,writeFile,mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
+import {RULE_IDS} from '../../src/decider.mjs';
 import assert from 'node:assert/strict';
 import {respond,withXdrDenies} from './respond.mjs';
 import {createConnectedDecider} from './connected-decider.mjs';
@@ -20,23 +21,28 @@ try{
   const summary=await respond({fixture:replay,now,mode:'isolated_learning_replay',
     outputRulesUrl:rulesUrl,outputAlertsUrl:new URL('../alerts.log',import.meta.url)});
   const contexts=new Map();let clock=now;
-  // Simulates an already-authorized engine request, not an alternative production policy.
-  const existingPolicy=async request=>({schema:'aleph.decision.v1',requestId:request.requestId,
-    decision:'allow',reasonCode:'approved',ruleIds:['fixture_existing_policy']});
-  const adapter=withXdrDenies(existingPolicy,{getVerifiedSource:async r=>contexts.get(r.requestId),
-    denyReasonCode:'fixture_xdr_deny',mode:'isolated_learning_replay',now:()=>clock,
+  const makeRequest=()=>({schema:'aleph.decision.v1',requestId:randomUUID(),
+    classId:'class_fixture',projectId:'project_fixture',subjectId:'subject_fixture',
+    deviceId:'a'.repeat(16),service:'notes',method:'GET',path:'/notes/replay',route:'GET /notes/:id',
+    queryLength:0,querySha256:createHash('sha256').update('').digest('hex'),
+    at:new Date(clock).toISOString(),policyRevision:1,deviceRegistered:true,
+    stepUp:{verified:false,authAgeSeconds:null},recentEvents:[],
+    signals:{source:'judge_fixture',region:'unknown',network:'unknown',hour:0}});
+  const adapter=createConnectedDecider({getVerifiedSource:async r=>contexts.get(r.requestId),
+    mode:'isolated_learning_replay',now:()=>clock,
     loadRules:async()=>JSON.parse(await readFile(rulesUrl,'utf8')).rules});
   const results=[];
   for(const a of replay.alerts){
-    const request={schema:'aleph.decision.v1',requestId:randomUUID()};
+    const request=makeRequest();
     contexts.set(request.requestId,a.data.srcip);
     const output=await adapter(request);
     const expected=classify(a).action==='block'?'deny':'allow';
-    assert.equal(output.decision,expected);
+    assert.equal(output.decision,expected);assert.ok(output.ruleIds.every(id=>RULE_IDS.includes(id)));
+    assert.equal(Object.keys(output).sort().join(','),'decision,reasonCode,requestId,ruleIds,schema');
     results.push({alertId:a.id,classification:classify(a).action,expected,observed:output.decision,passed:true});
   }
-  const request={requestId:randomUUID()};contexts.set(request.requestId,replay.alerts[0].data.srcip);
-  clock+=900001;assert.equal((await adapter(request)).decision,'allow');
+  let request=makeRequest();contexts.set(request.requestId,replay.alerts[0].data.srcip);
+  clock+=900001;request.at=new Date(clock).toISOString();assert.equal((await adapter(request)).decision,'allow');
   const originalDeny={decision:'deny',reasonCode:'existing_deny',ruleIds:['original']};
   const preserve=withXdrDenies(async()=>originalDeny,{getVerifiedSource:async()=>{throw Error();},denyReasonCode:'fixture_xdr_deny'});
   assert.deepEqual(await preserve(request),originalDeny);
@@ -51,12 +57,18 @@ try{
   await respond({fixture:{...replay,alerts:[...replay.alerts,normalShared]},now,mode:'isolated_learning_replay',outputRulesUrl:rulesUrl,outputAlertsUrl:new URL('../alerts.log',import.meta.url)});
   const sharedRules=JSON.parse(await readFile(rulesUrl,'utf8')).rules;
   assert.ok(!sharedRules.some(r=>r.ip===normalShared.data.srcip));
-  clock=now;assert.equal((await adapter(request)).decision,'allow');
-  // Test the real current ZTNA baseline as well; do not hide its all-deny starter state.
-  const realConnected=createConnectedDecider({getVerifiedSource:async()=>normalShared.data.srcip,denyReasonCode:'starter_not_ready',loadRules:async()=>[],now:()=>now});
-  const realNormal=await realConnected({schema:'aleph.decision.v1',requestId:randomUUID()});
-  assert.equal(realNormal.decision,'deny');
-  const output={productionBaselineReady:realNormal.decision==='allow',productionBlocker:realNormal.reasonCode,
+  clock=now;request.at=new Date(clock).toISOString();assert.equal((await adapter(request)).decision,'allow');
+  const normalRequest=makeRequest();contexts.set(normalRequest.requestId,'192.0.2.60');
+  assert.equal((await adapter(normalRequest)).decision,'allow');
+  const unregistered={...normalRequest,deviceRegistered:false};
+  assert.equal((await adapter(unregistered)).decision,'deny');
+  assert.equal((await adapter({...normalRequest,route:'GET /admin'})).decision,'deny');
+  assert.equal((await adapter({...normalRequest,at:new Date(now-10000).toISOString()})).decision,'deny');
+  assert.equal((await adapter({...normalRequest,userId:'forged'})).decision,'deny');
+  for(const row of results)assert.ok(row.passed);
+  const output={baseDecider:'src/decider.mjs',realBaseDeciderReplayPassed:true,
+    existingDenyPreserved:true,unregisteredDeviceDenied:true,unauthorizedRouteDenied:true,
+    staleRequestDenied:true,extraIdentityFieldDenied:true,
     sharedIpProtectionPassed:true,mode:'isolated_learning_replay',activeDuringReplay:summary.active,
     attackDenied:results.filter(r=>r.observed==='deny').length,
     ambiguousAllowed:results.filter(r=>r.classification==='alert'&&r.observed==='allow').length,

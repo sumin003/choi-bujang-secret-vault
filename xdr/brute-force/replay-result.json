@@ -1,6 +1,11 @@
 {
-  "productionBaselineReady": false,
-  "productionBlocker": "starter_not_ready",
+  "baseDecider": "src/decider.mjs",
+  "realBaseDeciderReplayPassed": true,
+  "existingDenyPreserved": true,
+  "unregisteredDeviceDenied": true,
+  "unauthorizedRouteDenied": true,
+  "staleRequestDenied": true,
+  "extraIdentityFieldDenied": true,
   "sharedIpProtectionPassed": true,
   "mode": "isolated_learning_replay",
   "activeDuringReplay": 9,

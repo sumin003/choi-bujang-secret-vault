@@ -1,9 +1,10 @@
-import { decide as existingDecide } from '../../src/decider.mjs';
+import { decide as existingDecide, createBaseDecider } from '../../src/decider.mjs';
 import { withXdrDenies } from './respond.mjs';
 
-// The engine supplies these functions/settings from its trusted server context.
-// This module never changes existing ZTNA policy or accepts browser-supplied IPs.
-export function createConnectedDecider({getVerifiedSource,denyReasonCode,loadRules,now,mode}={}) {
-  return withXdrDenies(existingDecide,{getVerifiedSource,denyReasonCode,
+// Adds a deny-only check to the real base decider. IP stays in trusted server context,
+// outside the eighteen-field request contract. No fixture allow function is substituted.
+export function createConnectedDecider({getVerifiedSource,denyReasonCode='starter_not_ready',loadRules,now,mode}={}) {
+  const baseline = now ? createBaseDecider({now}) : existingDecide;
+  return withXdrDenies(baseline,{getVerifiedSource,denyReasonCode,denyRuleId:'xdr.brute_force.deny',
     ...(loadRules?{loadRules}:{}),...(now?{now}:{}),...(mode?{mode}:{})});
 }
