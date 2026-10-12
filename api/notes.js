@@ -1,3 +1,4 @@
+import { enforceXdr } from '../src/xdr-gate.mjs';
 import { randomUUID } from 'node:crypto';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 import config from '../aleph.config.json' with { type: 'json' };
@@ -10,6 +11,7 @@ export default async function handler(req, res) {
 
 export async function handleNotes(req, res, id) {
   res.setHeader('Cache-Control', 'no-store');
+  if (!enforceXdr(req, res)) return;
   const allowed = id === null ? ['GET', 'POST'] : ['GET', 'PUT', 'DELETE'];
   if (!allowed.includes(req.method)) {
     res.setHeader('Allow', allowed.join(', '));

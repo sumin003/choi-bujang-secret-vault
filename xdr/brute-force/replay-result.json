@@ -1,0 +1,214 @@
+{
+  "productionBaselineReady": false,
+  "productionBlocker": "starter_not_ready",
+  "sharedIpProtectionPassed": true,
+  "mode": "isolated_learning_replay",
+  "activeDuringReplay": 9,
+  "attackDenied": 10,
+  "ambiguousAllowed": 9,
+  "normalAllowed": 9,
+  "expiryPassed": true,
+  "existingPolicyPreserved": true,
+  "ipAccountAggregationPassed": true,
+  "duplicateDeduplicationPassed": true,
+  "windowExpiryPassed": true,
+  "fixtureUnchanged": true,
+  "results": [
+    {
+      "alertId": "bf-01",
+      "classification": "block",
+      "expected": "deny",
+      "observed": "deny",
+      "passed": true
+    },
+    {
+      "alertId": "bf-02",
+      "classification": "block",
+      "expected": "deny",
+      "observed": "deny",
+      "passed": true
+    },
+    {
+      "alertId": "bf-03",
+      "classification": "block",
+      "expected": "deny",
+      "observed": "deny",
+      "passed": true
+    },
+    {
+      "alertId": "bf-04",
+      "classification": "block",
+      "expected": "deny",
+      "observed": "deny",
+      "passed": true
+    },
+    {
+      "alertId": "bf-05",
+      "classification": "block",
+      "expected": "deny",
+      "observed": "deny",
+      "passed": true
+    },
+    {
+      "alertId": "bf-06",
+      "classification": "block",
+      "expected": "deny",
+      "observed": "deny",
+      "passed": true
+    },
+    {
+      "alertId": "bf-07",
+      "classification": "block",
+      "expected": "deny",
+      "observed": "deny",
+      "passed": true
+    },
+    {
+      "alertId": "bf-08",
+      "classification": "block",
+      "expected": "deny",
+      "observed": "deny",
+      "passed": true
+    },
+    {
+      "alertId": "bf-09",
+      "classification": "block",
+      "expected": "deny",
+      "observed": "deny",
+      "passed": true
+    },
+    {
+      "alertId": "bf-10",
+      "classification": "block",
+      "expected": "deny",
+      "observed": "deny",
+      "passed": true
+    },
+    {
+      "alertId": "bf-11",
+      "classification": "alert",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-12",
+      "classification": "alert",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-13",
+      "classification": "alert",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-14",
+      "classification": "alert",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-15",
+      "classification": "alert",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-16",
+      "classification": "alert",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-17",
+      "classification": "alert",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-18",
+      "classification": "alert",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-19",
+      "classification": "alert",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-20",
+      "classification": "record",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-21",
+      "classification": "record",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-22",
+      "classification": "record",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-23",
+      "classification": "record",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-24",
+      "classification": "record",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-25",
+      "classification": "record",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-26",
+      "classification": "record",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-27",
+      "classification": "record",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    },
+    {
+      "alertId": "bf-28",
+      "classification": "record",
+      "expected": "allow",
+      "observed": "allow",
+      "passed": true
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "technique": "T1110",
+  "scope": "학습용 경보의 근거 정리이며 자동 차단 규칙이 아닙니다. 시간·횟수 임계값을 MITRE 공식 기준으로 단정하지 않습니다.",
+  "patterns": [
+    {
+      "name": "같은 출발 주소의 짧은 시간 로그인 실패 연속",
+      "condition": "경보의 시각·data.srcip·rule.description과 제공되는 실패 집계에서 같은 출발 주소의 로그인 실패가 짧은 시간에 반복되는지 확인한다. 규칙 수준만으로 이 패턴을 확정하지 않는다.",
+      "evidence": "MITRE ATT&CK T1110은 반복적·체계적인 비밀번호 추측을 설명하고 인증 실패의 반복과 시간대 연관 분석을 탐지 근거로 제시한다.",
+      "source": "https://attack.mitre.org/techniques/T1110/"
+    },
+    {
+      "name": "여러 계정에 같은 비밀번호 대입",
+      "condition": "경보 설명에 여러 계정을 대상으로 동일한 비밀번호를 반복 대입했다는 근거가 있는지 확인한다. 계정 수나 같은 주소만으로 동일 비밀번호 사용을 추정하지 않으며 실제 비밀번호는 읽거나 저장하지 않는다.",
+      "evidence": "MITRE ATT&CK T1110.003 Password Spraying은 한 개 또는 소수의 비밀번호를 여러 계정에 시도하는 무차별 대입 형태이다.",
+      "source": "https://attack.mitre.org/techniques/T1110/003/"
+    }
+  ]
+}

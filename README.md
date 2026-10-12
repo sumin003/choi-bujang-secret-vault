@@ -2,6 +2,20 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
+## XDR 보너스: 로그인 공격 분류와 서버 추가 검사
+
+- xdr/brute-force/read-alerts.mjs는 원본 경보 28건에서 다섯 항목만 추출하고 비밀값처럼 보이는 필드를 가립니다. 원본 경보는 변경하지 않습니다.
+- patterns.json의 MITRE T1110 근거를 독립형 decide.mjs 상수로 복사했습니다. 파일 입출력·네트워크·import 없이 block/alert/record와 확신도·패턴 이름을 반환합니다.
+- respond.mjs는 주소·계정별 3분 시간창으로 중복 경보 번호를 제외해 집계한 뒤 같은 decide 함수를 호출합니다. 입력 count는 겹치지 않는 실패 묶음이어야 하며 누적 집계 경보는 먼저 정규화해야 합니다. 명확한 후보만 15분 만료형 IP 거부 규칙으로 저장하고 근거 경보 번호를 기록합니다. 정상 로그인 근거가 있는 공유 주소는 차단 대신 알림으로 낮춥니다.
+- src/xdr-gate.mjs를 로그인 /api/auth와 메모 /api/notes 및 /api/notes/:id 서버 경로에 연결했습니다. Vercel 환경의 x-vercel-forwarded-for 주소만 사용하며 브라우저 본문·일반 전달 헤더를 주소 근거로 사용하지 않습니다. 로컬에서는 TCP 연결 주소만 사용합니다. 기존 로그인·소유자 검사와 src/decider.mjs 규칙은 유지합니다.
+- 운영용 live 규칙만 서버가 검사합니다. 차단 시 403 JSON XDR_BLOCKED, 정상 주소는 기존 서버 검사로 진행하며, 활성 규칙이 없으면 X-XDR-Check: no-active-rules 응답 헤더를 붙입니다. 시험용 replay 규칙은 배포에 포함하지 않습니다.
+- 현재 가상 경보는 과거 시각이므로 배포용 deny-rules.json은 rules: []입니다. 규칙 파일은 배포에 포함되는 스냅샷입니다. 새로운 규칙을 배포에 반영하려면 신뢰할 수 있는 경보로 respond를 실행하고 검토 후 재배포해야 합니다. 실행 중인 Vercel의 파일을 수정하거나 Wazuh 실시간 수집이 연결됐다고 기록하지 않습니다.
+- 로컬 검증: 읽기 28건=28행, result.json block 10/alert 9/record 9, 정상 오차단 0건. 재생 연결에서 공격 10건 거부·애매 9건 및 정상 9건 통과, 공유 주소 보호·만료 해제 통과. 서버 경로 시험에서 차단 주소가 Auth/DB에 도달하지 않고 정상 CRUD와 미로그인 401이 유지됨을 확인했습니다. 이 결과는 가상 입력과 상위 서버 대체 시험이며 실제 공격 트래픽 차단 증거가 아닙니다.
+- 외부 수업 운영 ZTNA 엔진은 별도입니다. connected-decider.mjs는 기존 판정기 추가 검사 부품이지만, 현재 starter.deny 기본 판정기와 외부 엔진의 출발 주소 제공 연결은 아직 구현되지 않았습니다. 자료실 API의 실제 검사 경로와 구분합니다.
+
+실행: `npm run xdr:run -- brute-force` / 연결 재생: `node xdr/brute-force/replay.mjs` / 서버 검사 시험: `node --test test/xdr-gate.test.mjs`.
+배포 확인: 브라우저 개발자 도구 Network에서 로그인·메모 API의 응답 헤더 X-XDR-Check를 확인합니다. 메모 요청 헤더의 토큰과 로그인 본문을 공유하지 마세요.
+
 ## 5단계 저장점
 
 메모 CRUD는 기존 서버 함수와 로그인·소유자 검사를 유지합니다. public.learning_notes의 PUBLIC·anon·authenticated 직접 권한을 회수했고 service_role 권한과 네 RLS 정책을 유지했습니다. originalApiUrl에는 쿼리 없는 원본 HTTPS 경로를 기록했습니다. step은 5이고 allowedRoutes의 메모 GET·POST·PUT·DELETE 경로와 nosniff 설정은 유지합니다.

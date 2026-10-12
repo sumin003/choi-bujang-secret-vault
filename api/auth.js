@@ -1,6 +1,8 @@
+import { enforceXdr } from '../src/xdr-gate.mjs';
 // Only the official SDK's password, refresh, user and local logout requests are relayed.
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
+  if (!enforceXdr(req, res)) return;
   res.setHeader('X-Content-Type-Options', 'nosniff');
   const action = req.query?.action;
   const grant = req.query?.grant_type;
