@@ -24,6 +24,9 @@ export async function runAttackChecks(config) {
   }
   if (config.step === 8) {
     for (const [attackId, input, expected] of [
+      ['note_collection_local', {...normal,path:'/notes',route:'GET /notes'}, '가상 메모 전체 목록 경로는 deny'],
+      ['notice_write_local', {...normal,subjectId:'teacher_fixture',service:'instructor_announcements',method:'PUT',
+        path:'/announcements/notice-demo',route:'PUT /announcements/:id'}, '역할 없는 엔진 계약에서 공지 쓰기는 deny'],
       ['foreign_owner_local', {...normal,subjectId:'other_learner_fixture'}, '같은 가상 메모를 다른 사용자가 요청하면 deny'],
       ['foreign_zone_local', {...normal,service:'other_zone',path:'/other-zone/item',route:'GET /other-zone/:id'}, '가상 다른 구역 요청은 deny'],
       ['student_notice_local', {...normal,service:'instructor_announcements',method:'PUT',

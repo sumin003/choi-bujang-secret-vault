@@ -39,6 +39,15 @@ export async function checkDecider({ decide, ruleIds }) {
       decision: 'allow' },
     );
   }
+  if (ruleIds.includes('resource_zone')) {
+    checks.push(
+      {name:'메모 전체 목록 경로 거부',request:{...normal,requestId:randomUUID(),
+        path:'/notes',route:'GET /notes'},decision:'deny'},
+      {name:'공지 쓰기 경로 거부',request:{...normal,requestId:randomUUID(),
+        subjectId:'teacher_fixture',service:'instructor_announcements',method:'PUT',
+        path:'/announcements/notice-demo',route:'PUT /announcements/:id'},decision:'deny'},
+    );
+  }
   const results = [];
   for (const item of checks) {
     const response = await decide(item.request);

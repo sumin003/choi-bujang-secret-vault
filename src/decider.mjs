@@ -58,15 +58,17 @@ export function fixtureZoneAccess(request) {
   const id=request.path.split('/').at(-1);
   const collection=['/notes','/api/notes','/announcements','/api/announcements'].includes(request.path);
   if (resource===RESOURCE_IDS.notes) {
-    if (collection) return ['GET','POST'].includes(request.method);
+    if (collection) return request.method==='POST';
     return Object.hasOwn(NOTE_OWNERS,id) && NOTE_OWNERS[id]===request.subjectId
       && ['GET','PUT','DELETE'].includes(request.method);
   }
   if (resource===RESOURCE_IDS.instructorAnnouncements) {
+    // The eighteen-field engine contract cannot establish an instructor role.
+    if (request.method!=='GET') return false;
     if (role!=='instructor') return false;
-    if (collection) return ['GET','POST'].includes(request.method);
+    if (collection) return true;
     return Object.hasOwn(NOTICE_OWNERS,id) && NOTICE_OWNERS[id]===request.subjectId
-      && ['GET','PUT','DELETE'].includes(request.method);
+      && request.method==='GET';
   }
   return false;
 }
@@ -225,6 +227,16 @@ function requiresStepUp(request) {
     && request.recentEvents.some(event => event.kind === 'risk_signal'
       && event.ageSeconds <= 120 && event.count >= 20);
 }
+function forbiddenEngineZone(request) {
+  const resource=resourceIdForRequest(request);
+  // A collection read can expose multiple owners; the HTTP API separately
+  // filters its authenticated user's list and is not this engine entry point.
+  if (resource===RESOURCE_IDS.notes && request.method==='GET'
+    && ['/notes','/api/notes'].includes(request.path)) return true;
+  // No instructor role exists in the engine request contract. Stored HTTP API
+  // permissions must never promote an engine request into a notice writer.
+  return resource===RESOURCE_IDS.instructorAnnouncements && request.method!=='GET';
+}
 export function createBaseDecider({now=()=>Date.now(), authorizeResource=createZoneAuthorizer()}={}) {
   return async request => {
     if (request?.deviceRegistered !== true) {
@@ -233,7 +245,7 @@ export function createBaseDecider({now=()=>Date.now(), authorizeResource=createZ
     }
     if (!normalRequest(request, now())) return starterDeny(request);
     let authorized = false;
-    try { authorized = await authorizeResource(request) === true; } catch { /* Fail closed without logging credentials. */ }
+    try { authorized = !forbiddenEngineZone(request) && await authorizeResource(request) === true; } catch { /* Fail closed without logging credentials. */ }
     if (!authorized) return {schema:'aleph.decision.v1',requestId:request.requestId,
       decision:'deny',reasonCode:'starter_not_ready',ruleIds:['resource_zone']};
     if (requiresStepUp(request) && request.stepUp.verified !== true) {

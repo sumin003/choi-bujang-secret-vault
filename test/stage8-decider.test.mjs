@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { decide } from '../src/decider.mjs';
+import { decide, createBaseDecider } from '../src/decider.mjs';
 import { fixtureRequests } from '../scripts/fixture-7.mjs';
 
 function own(patch={}) {return {...fixtureRequests().normal,...patch};}
@@ -41,12 +41,34 @@ test('students cannot create, update or delete instructor announcements',async()
       path:'/announcements',route:'POST /announcements'}),'deny');
   }
 });
-test('explicitly registered synthetic instructor can update its own announcement',async()=>{
-  await expect(single('teacher_fixture','notice-demo','PUT',true),'allow');
+test('no engine subject can write notices, including a synthetic instructor',async()=>{
+  for(const subjectId of ['learner_fixture','other_learner_fixture','teacher_fixture'])
+    for(const prefix of ['/announcements','/api/announcements'])
+      for(const method of ['POST','PUT','PATCH','DELETE']) {
+        const collection=method==='POST';
+        await expect(own({subjectId,service:'instructor_announcements',method,
+          path:prefix+(collection?'':'/notice-demo'),
+          route:method+' '+prefix+(collection?'':'/:id')}),'deny');
+      }
 });
-test('student collection requests preserve list and creation routes',async()=>{
-  for(const subjectId of ['learner_fixture','other_learner_fixture'])for(const method of ['GET','POST'])
-    await expect(own({subjectId,method,path:'/notes',route:method+' /notes'}),'allow');
+test('engine denies note collection reads while preserving creation and individual reads',async()=>{
+  for(const subjectId of ['learner_fixture','other_learner_fixture'])
+    for(const path of ['/notes','/api/notes']) {
+      const denied=await expect(own({subjectId,method:'GET',path,route:'GET '+path}),'deny');
+      assert.deepEqual(denied.ruleIds,['resource_zone']);
+      await expect(own({subjectId,method:'POST',path,route:'POST '+path}),'allow');
+    }
+  await expect(own(),'allow');
+});
+test('stored or injected authorization cannot bypass forbidden engine zones',async()=>{
+  let checked=0;
+  const engine=createBaseDecider({authorizeResource:async()=>{checked++;return true;}});
+  for(const r of [own({path:'/notes',route:'GET /notes'}),
+    single('teacher_fixture','notice-demo','PUT',true)]) {
+    const denied=await engine(r);
+    assert.equal(denied.decision,'deny');assert.deepEqual(denied.ruleIds,['resource_zone']);
+  }
+  assert.equal(checked,0);
 });
 test('unregistered IDs and substring-like subject names never grant ownership',async()=>{
   for(const r of [single('learner_fixture_evil','demo'),single('other_learner_fixture','learner_fixture-demo'),
@@ -90,7 +112,11 @@ test('decider alone loads and evaluates without sibling modules, packages or ser
     const cases=[normal,{...normal,subjectId:'other_learner_fixture'},
       {...normal,deviceRegistered:false},suspicious,
       {...suspicious,stepUp:{verified:true,authAgeSeconds:60}},
-      {...normal,path:'/notes/export'}, {...normal,classId:'unregistered_class'}];
+      {...normal,path:'/notes/export'}, {...normal,classId:'unregistered_class'},
+      {...normal,path:'/notes',route:'GET /notes'},
+      {...normal,path:'/api/notes',route:'GET /api/notes'},
+      {...normal,subjectId:'teacher_fixture',service:'instructor_announcements',method:'PUT',
+        path:'/announcements/notice-demo',route:'PUT /announcements/:id'}];
     const results=[];
     for(const request of cases)results.push(await decide(request));
     const unavailable=await decideAuthenticatedResource({
@@ -102,7 +128,7 @@ test('decider alone loads and evaluates without sibling modules, packages or ser
   const output=execFileSync(process.execPath,['--input-type=module','-e',program],{
     input:JSON.stringify({source,normal,suspicious}),encoding:'utf8',timeout:5000});
   const {results,unavailable}=JSON.parse(output);
-  assert.deepEqual(results.map(r=>r.decision),['allow','deny','deny','step_up','allow','deny','deny']);
+  assert.deepEqual(results.map(r=>r.decision),['allow','deny','deny','step_up','allow','deny','deny','deny','deny','deny']);
   assert.equal(results[1].ruleIds[0],'resource_zone');
   assert.equal(results[2].reasonCode,'device_not_registered');
   for(const r of results)assert.deepEqual(Object.keys(r).sort(),['decision','reasonCode','requestId','ruleIds','schema']);
