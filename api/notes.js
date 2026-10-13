@@ -11,7 +11,12 @@ export default async function handler(req, res) {
 
 export async function handleNotes(req, res, id) {
   res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Resource-Id', 'notes');
   if (!enforceXdr(req, res)) return;
+  if (typeof req.url !== 'string') return res.status(400).json({error:'INVALID_ROUTE'});
+  const target = new URL(req.url, 'https://request.invalid');
+  if (target.search || target.pathname !== '/api/notes' + (id === null ? '' : '/' + id))
+    return res.status(400).json({error:'INVALID_ROUTE'});
   const allowed = id === null ? ['GET', 'POST'] : ['GET', 'PUT', 'DELETE'];
   if (!allowed.includes(req.method)) {
     res.setHeader('Allow', allowed.join(', '));
@@ -79,8 +84,10 @@ export async function handleNotes(req, res, id) {
     if (!response.ok) throw new Error();
     const rows = await response.json();
     if (!Array.isArray(rows)) throw new Error();
-    if (rows.some(row => row.owner_id !== identity.userId)) throw new Error();
-    if (id !== null && rows.length === 0) return res.status(404).json({ error: 'NOTE_NOT_FOUND' });
+    if (rows.some(row => row.owner_id !== identity.userId)) {
+      return res.status(403).json({ error: 'ACCESS_DENIED', reason: 'owner_mismatch' });
+    }
+    if (id !== null && rows.length === 0) return res.status(404).json({ error: 'NOTE_NOT_FOUND', reason: 'not_found_or_not_owned' });
     if (req.method === 'DELETE') return res.status(204).end();
     const notes = rows.map(row => {
       if (!UUID.test(row.id ?? '') || typeof row.title !== 'string' || typeof row.body !== 'string') throw new Error();

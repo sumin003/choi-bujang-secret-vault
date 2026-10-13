@@ -3,8 +3,8 @@ import { withXdrDenies } from './respond.mjs';
 
 // Adds a deny-only check to the real base decider. IP stays in trusted server context,
 // outside the eighteen-field request contract. No fixture allow function is substituted.
-export function createConnectedDecider({getVerifiedSource,denyReasonCode='starter_not_ready',loadRules,now,mode}={}) {
-  const baseline = now ? createBaseDecider({now}) : existingDecide;
+export function createConnectedDecider({getVerifiedSource,denyReasonCode='starter_not_ready',loadRules,now,mode,authorizeResource}={}) {
+  const baseline = now || authorizeResource ? createBaseDecider({...(now?{now}:{}),...(authorizeResource?{authorizeResource}:{})}) : existingDecide;
   return withXdrDenies(baseline,{getVerifiedSource,denyReasonCode,denyRuleId:'xdr.brute_force.deny',
     ...(loadRules?{loadRules}:{}),...(now?{now}:{}),...(mode?{mode}:{})});
 }

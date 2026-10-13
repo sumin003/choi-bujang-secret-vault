@@ -1,3 +1,4 @@
+import { fixtureAuthorize } from '../scripts/resource-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile,mkdtemp,rm} from 'node:fs/promises';
@@ -24,14 +25,14 @@ test('web candidates connect to real ZTNA; ambiguous and normal requests pass; o
     assert.ok(policies.every(r=>r.alertIds.length>0&&Date.parse(r.expiresAt)>now));
     const contexts=new Map();
     const getVerifiedSource=async r=>contexts.get(r.requestId);
-    const brute=connectBruteForce({getVerifiedSource,now:()=>clock,mode:'isolated_learning_replay',loadRules:async()=>[]});
+    const brute=connectBruteForce({authorizeResource:fixtureAuthorize,getVerifiedSource,now:()=>clock,mode:'isolated_learning_replay',loadRules:async()=>[]});
     const connected=createConnectedDecider({baseDecide:brute,getVerifiedSource,now:()=>clock,mode:'isolated_learning_replay',
       loadRules:async()=>JSON.parse(await readFile(rulesUrl,'utf8')).rules});
-    const request=ip=>{const r={schema:'aleph.decision.v1',requestId:randomUUID(),classId:'class_fixture',projectId:'project_fixture',subjectId:'subject_fixture',
-      deviceId:'a'.repeat(16),service:'notes',method:'GET',path:'/notes/test',route:'GET /notes/:id',queryLength:0,
+    const request=ip=>{const r={schema:'aleph.decision.v1',requestId:randomUUID(),classId:'class_fixture',projectId:'project_fixture',subjectId:'learner_fixture',
+      deviceId:'a'.repeat(16),service:'notes',method:'GET',path:'/notes/11111111-1111-4111-8111-111111111111',route:'GET /notes/:id',queryLength:0,
       querySha256:createHash('sha256').update('').digest('hex'),at:new Date(clock).toISOString(),policyRevision:1,
       deviceRegistered:true,stepUp:{verified:false,authAgeSeconds:null},recentEvents:[],
-      signals:{source:'judge_fixture',region:'unknown',network:'unknown',hour:0}};contexts.set(r.requestId,ip);return r;};
+      signals:{source:'none',region:'unknown',network:'unknown',hour:0}};contexts.set(r.requestId,ip);return r;};
     for(let i=0;i<fixture.alerts.length;i++){
       const r=await connected(request(fixture.alerts[i].data.srcip));assert.equal(r.decision,i<8?'deny':'allow');
       assert.ok(r.ruleIds.every(id=>RULE_IDS.includes(id)));

@@ -43,13 +43,13 @@ test('actual notes server keeps normal CRUD; denied source never reaches DB',asy
       if(init.method==='DELETE')selected.forEach(r=>rows.delete(r.note_id));}
     return Response.json(selected.map(r=>({id:r.note_id,title:r.title,body:r.content,owner_id:r.owner_id})));
   };
-  const call=async(method,id=null,ip=normal,body={title:'fixture',body:'fixture'})=>{const r=req(ip);r.method=method;r.headers.authorization='fixture';r.headers['content-type']='application/json';r.body=body;const s=res();await handleNotes(r,s,id);return s;};
+  const call=async(method,id=null,ip=normal,body={title:'fixture',body:'fixture'})=>{const r=req(ip);r.method=method;r.url="/api/notes"+(id===null?"":"/"+id);r.headers.authorization='fixture';r.headers['content-type']='application/json';r.body=body;const s=res();await handleNotes(r,s,id);return s;};
   try{
     const before=dbCalls;assert.equal((await call('GET',null,blocked)).statusCode,403);assert.equal(dbCalls,before);
     const created=await call('POST');assert.equal(created.statusCode,201);const id=created.body.id;
     assert.equal((await call('GET',id)).statusCode,200);assert.equal((await call('PUT',id)).statusCode,200);
     assert.equal((await call('DELETE',id)).statusCode,204);assert.equal((await call('GET',id)).statusCode,404);
-    const r=req(normal);r.method='GET';const s=res();await handleNotes(r,s,null);assert.equal(s.statusCode,401);
+    const r=req(normal);r.method='GET';r.url='/api/notes';const s=res();await handleNotes(r,s,null);assert.equal(s.statusCode,401);
   }finally{globalThis.fetch=oldFetch;delete globalThis.__gate;delete globalThis.__verify;
     if(oldUrl===undefined)delete process.env.SUPABASE_URL;else process.env.SUPABASE_URL=oldUrl;
     if(oldKey===undefined)delete process.env.SUPABASE_SECRET_KEY;else process.env.SUPABASE_SECRET_KEY=oldKey;}

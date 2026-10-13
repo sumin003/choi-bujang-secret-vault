@@ -1,3 +1,4 @@
+import { fixtureAuthorize } from '../../scripts/resource-fixture.mjs';
 import {readFile,writeFile,mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -22,13 +23,13 @@ try{
     outputRulesUrl:rulesUrl,outputAlertsUrl:new URL('../alerts.log',import.meta.url)});
   const contexts=new Map();let clock=now;
   const makeRequest=()=>({schema:'aleph.decision.v1',requestId:randomUUID(),
-    classId:'class_fixture',projectId:'project_fixture',subjectId:'subject_fixture',
-    deviceId:'a'.repeat(16),service:'notes',method:'GET',path:'/notes/replay',route:'GET /notes/:id',
+    classId:'class_fixture',projectId:'project_fixture',subjectId:'learner_fixture',
+    deviceId:'a'.repeat(16),service:'notes',method:'GET',path:'/notes/11111111-1111-4111-8111-111111111111',route:'GET /notes/:id',
     queryLength:0,querySha256:createHash('sha256').update('').digest('hex'),
     at:new Date(clock).toISOString(),policyRevision:1,deviceRegistered:true,
     stepUp:{verified:false,authAgeSeconds:null},recentEvents:[],
-    signals:{source:'judge_fixture',region:'unknown',network:'unknown',hour:0}});
-  const adapter=createConnectedDecider({getVerifiedSource:async r=>contexts.get(r.requestId),
+    signals:{source:'none',region:'unknown',network:'unknown',hour:0}});
+  const adapter=createConnectedDecider({authorizeResource:fixtureAuthorize,getVerifiedSource:async r=>contexts.get(r.requestId),
     mode:'isolated_learning_replay',now:()=>clock,
     loadRules:async()=>JSON.parse(await readFile(rulesUrl,'utf8')).rules});
   const results=[];

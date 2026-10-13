@@ -1,3 +1,4 @@
+import { fixtureAuthorize } from '../scripts/resource-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash,randomUUID} from 'node:crypto';
@@ -5,15 +6,15 @@ import {createBaseDecider,RULE_IDS} from '../src/decider.mjs';
 import {createConnectedDecider} from '../xdr/brute-force/connected-decider.mjs';
 const now=Date.now();
 const normal=()=>({schema:'aleph.decision.v1',requestId:randomUUID(),classId:'class_fixture',
-  projectId:'project_fixture',subjectId:'subject_fixture',deviceId:'a'.repeat(16),service:'notes',
-  method:'GET',path:'/notes/test',route:'GET /notes/:id',queryLength:0,
+  projectId:'project_fixture',subjectId:'learner_fixture',deviceId:'a'.repeat(16),service:'notes',
+  method:'GET',path:'/notes/11111111-1111-4111-8111-111111111111',route:'GET /notes/:id',queryLength:0,
   querySha256:createHash('sha256').update('').digest('hex'),at:new Date(now).toISOString(),
   policyRevision:1,deviceRegistered:true,stepUp:{verified:false,authAgeSeconds:null},recentEvents:[],
-  signals:{source:'judge_fixture',region:'unknown',network:'unknown',hour:0}});
-const decide=createBaseDecider({now:()=>now});
+  signals:{source:'none',region:'unknown',network:'unknown',hour:0}});
+const decide=createBaseDecider({now:()=>now,authorizeResource:fixtureAuthorize});
 test('real base decider permits only valid engine-confirmed notes routes',async()=>{
   for(const prefix of ['/notes','/api/notes'])for(const method of ['GET','POST','PUT','DELETE']){
-    const path=method==='POST'?prefix:prefix+'/test';
+    const path=method==='POST'?prefix:prefix+'/11111111-1111-4111-8111-111111111111';
     const request={...normal(),method,path,route:method+' '+prefix+(method==='POST'?'':'/:id')};
     const r=await decide(request);assert.equal(r.decision,'allow');
     assert.deepEqual(Object.keys(r).sort(),['decision','reasonCode','requestId','ruleIds','schema']);
@@ -33,7 +34,7 @@ test('XDR wraps real base: attack deny, normal allow, expiry release, base denia
   const r={mode:'isolated_learning_replay',action:'deny',ip:'192.0.2.10',confidence:.95,
     ruleId:'xdr.brute-force.fixture',alertIds:['bf-01'],createdAt:new Date(now).toISOString(),expiresAt:new Date(now+1000).toISOString()};
   const contexts=new Map();
-  const connected=createConnectedDecider({mode:'isolated_learning_replay',now:()=>clock,
+  const connected=createConnectedDecider({authorizeResource:fixtureAuthorize,mode:'isolated_learning_replay',now:()=>clock,
     getVerifiedSource:async q=>contexts.get(q.requestId),loadRules:async()=>[r]});
   const attack=normal(),good=normal();contexts.set(attack.requestId,r.ip);contexts.set(good.requestId,'192.0.2.60');
   assert.equal((await connected(attack)).decision,'deny');assert.equal((await connected(good)).decision,'allow');

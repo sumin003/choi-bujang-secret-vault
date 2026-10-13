@@ -1,6 +1,8 @@
+import { RESOURCE_IDS, resourceIdForRequest } from './resources.mjs';
+import { createResourceAuthorizer } from './resource-access.mjs';
 // Only the engine-validated request contract is accepted here.
 // XDR is a separate, deny-only layer and never supplies an allow decision.
-export const RULE_IDS = Object.freeze(['starter.deny', 'verified_request.allow', 'xdr.brute_force.deny', 'device_registered', 'step_up_required']);
+export const RULE_IDS = Object.freeze(['starter.deny', 'verified_request.allow', 'xdr.brute_force.deny', 'device_registered', 'step_up_required', 'resource_zone']);
 const FIELDS = ['schema', 'requestId', 'classId', 'projectId', 'subjectId', 'deviceId',
   'service', 'method', 'path', 'route', 'queryLength', 'querySha256', 'at',
   'policyRevision', 'deviceRegistered', 'stepUp', 'recentEvents', 'signals'];
@@ -26,6 +28,15 @@ function validSignals(signals) {
 }
 
 function allowedRoute(request) {
+  // Query contents are unavailable in this contract; no query may select a function.
+  if (request.queryLength !== 0
+    || request.querySha256 !== 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855') return false;
+  // Function names are never accepted as a resource ID at the /:id depth.
+  const finalSegment = typeof request.path === 'string' ? request.path.split('/').at(-1) : '';
+  if (['export', 'import', 'search', 'bulk', 'download', 'upload', 'action', 'admin'].includes(finalSegment.toLowerCase())) return false;
+  const resource = resourceIdForRequest(request);
+  if (resource === RESOURCE_IDS.instructorAnnouncements) return true;
+  if (resource !== RESOURCE_IDS.notes) return false;
   if(request.service !== 'notes') return false;
   // The engine uses /notes; the application uses /api/notes. Both describe the same five routes.
   const collection = request.path === '/notes' || request.path === '/api/notes';
@@ -69,19 +80,23 @@ function requiresStepUp(request) {
     && request.recentEvents.some(event => event.kind === 'risk_signal'
       && event.ageSeconds <= 120 && event.count >= 20);
 }
-export function createBaseDecider({now=()=>Date.now()}={}) {
+export function createBaseDecider({now=()=>Date.now(), authorizeResource=createResourceAuthorizer()}={}) {
   return async request => {
     if (request?.deviceRegistered !== true) {
       return {schema:'aleph.decision.v1',requestId:request?.requestId,decision:'deny',
         reasonCode:'device_not_registered',ruleIds:['device_registered']};
     }
     if (!normalRequest(request, now())) return starterDeny(request);
+    let authorized = false;
+    try { authorized = await authorizeResource(request) === true; } catch { /* Fail closed without logging credentials. */ }
+    if (!authorized) return {schema:'aleph.decision.v1',requestId:request.requestId,
+      decision:'deny',reasonCode:'starter_not_ready',ruleIds:['resource_zone']};
     if (requiresStepUp(request) && request.stepUp.verified !== true) {
       return {schema:'aleph.decision.v1',requestId:request.requestId,decision:'step_up',
         reasonCode:'step_up_required',ruleIds:['device_registered','step_up_required']};
     }
     return {schema:'aleph.decision.v1',requestId:request.requestId,decision:'allow',
-      reasonCode:'approved',ruleIds:['verified_request.allow','device_registered']};
+      reasonCode:'approved',ruleIds:['verified_request.allow','device_registered','resource_zone']};
   };
 }
 const baseDecide = createBaseDecider();

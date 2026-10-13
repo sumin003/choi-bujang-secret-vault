@@ -51,7 +51,11 @@ export async function checkDecider({ decide, ruleIds }) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const { decide, RULE_IDS } = await import('../src/decider.mjs');
+    const module = await import('../src/decider.mjs');
+    const { RULE_IDS } = module;
+    const { fixtureAuthorize } = await import('./resource-fixture.mjs');
+    const decide = RULE_IDS.includes('resource_zone')
+      ? module.createBaseDecider({authorizeResource:fixtureAuthorize}) : module.decide;
     const results = await checkDecider({ decide, ruleIds: RULE_IDS });
     for (const item of results) process.stdout.write(`${item.passed ? '통과' : '확인 필요'} · ${item.name}\n`);
     process.stdout.write('이 명령은 가상 요청으로 연습하며 심판 통과 증거가 아닙니다.\n');
