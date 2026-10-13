@@ -1,6 +1,5 @@
 import { fixtureRequests } from '../scripts/fixture-7.mjs';
-import { decide, createBaseDecider } from './decider.mjs';
-import { fixtureAuthorize } from '../scripts/resource-fixture.mjs';
+import { decide } from './decider.mjs';
 
 // Record only what was actually requested/returned, never keys, tokens or response bodies.
 export async function runAttackChecks(config) {
@@ -10,7 +9,7 @@ export async function runAttackChecks(config) {
   if (app.protocol !== 'https:' || app.username || app.password || app.search || app.hash || app.pathname !== '/')
     throw new Error('자료실의 HTTPS 배포 주소를 확인해 주세요.');
   const { normal, suspicious } = fixtureRequests();
-  const evaluate = config.step === 8 ? createBaseDecider({authorizeResource:fixtureAuthorize}) : decide;
+  const evaluate = decide;
   const result = await evaluate(normal);
   const attempts = [{ attackId: 'registered_device_local', expected: '등록 기기의 정상 가상 요청은 allow',
     observed: '로컬 가상 판정: ' + result.decision + ' · ' + result.reasonCode + ' (실제 접속·심판 판정 아님)' }];
@@ -25,7 +24,7 @@ export async function runAttackChecks(config) {
   }
   if (config.step === 8) {
     for (const [attackId, input, expected] of [
-      ['foreign_note_local', {...normal,subjectId:'other_fixture'}, '가상 타인 메모 요청은 deny'],
+      ['foreign_zone_local', {...normal,service:'other_zone',path:'/other-zone/item',route:'GET /other-zone/:id'}, '가상 다른 구역 요청은 deny'],
       ['student_notice_local', {...normal,service:'instructor_announcements',method:'PUT',
         path:'/api/announcements/22222222-2222-4222-8222-222222222222',route:'PUT /api/announcements/:id'}, '가상 학생 공지 수정은 deny'],
     ]) {
