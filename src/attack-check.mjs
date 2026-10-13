@@ -4,14 +4,23 @@ import { decide } from './decider.mjs';
 // Record only what was actually requested/returned, never keys, tokens or response bodies.
 export async function runAttackChecks(config) {
   if (config.step === 1) return legacyStageOne(config);
-  if (config.step !== 6) throw new Error('이 단계의 자기 점검을 구현해 주세요.');
+  if (![6, 7].includes(config.step)) throw new Error('이 단계의 자기 점검을 구현해 주세요.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.search || app.hash || app.pathname !== '/')
     throw new Error('자료실의 HTTPS 배포 주소를 확인해 주세요.');
-  const { normal } = fixtureRequests();
+  const { normal, suspicious } = fixtureRequests();
   const result = await decide(normal);
   const attempts = [{ attackId: 'registered_device_local', expected: '등록 기기의 정상 가상 요청은 allow',
     observed: '로컬 가상 판정: ' + result.decision + ' · ' + result.reasonCode + ' (실제 접속·심판 판정 아님)' }];
+  if (config.step === 7) {
+    for (const [attackId, input, expected] of [
+      ['composite_event_local', suspicious, '복합 이상 가상 사건은 step_up'],
+      ['reconfirmed_event_local', { ...suspicious, stepUp: { verified: true, authAgeSeconds: 60 } }, '가상 추가 확인 후 allow'],
+    ]) {
+      const output = await decide(input);
+      attempts.push({ attackId, expected, observed: '로컬 가상 판정: ' + output.decision + ' · ' + output.reasonCode + ' (실제 재로그인·자료 차단 실측 아님)' });
+    }
+  }
   try {
     const response = await fetch(new URL('/api/notes', app), { redirect: 'error',
       signal: AbortSignal.timeout(10000), cache: 'no-store', headers: { Accept: 'application/json' } });

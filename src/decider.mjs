@@ -1,6 +1,6 @@
 // Only the engine-validated request contract is accepted here.
 // XDR is a separate, deny-only layer and never supplies an allow decision.
-export const RULE_IDS = Object.freeze(['starter.deny', 'verified_request.allow', 'xdr.brute_force.deny', 'device_registered']);
+export const RULE_IDS = Object.freeze(['starter.deny', 'verified_request.allow', 'xdr.brute_force.deny', 'device_registered', 'step_up_required']);
 const FIELDS = ['schema', 'requestId', 'classId', 'projectId', 'subjectId', 'deviceId',
   'service', 'method', 'path', 'route', 'queryLength', 'querySha256', 'at',
   'policyRevision', 'deviceRegistered', 'stepUp', 'recentEvents', 'signals'];
@@ -9,6 +9,21 @@ const plainObject = value => value !== null && typeof value === 'object' && !Arr
 const exactKeys = (value, keys) => plainObject(value) && Object.keys(value).length === keys.length
   && keys.every(key => Object.hasOwn(value,key));
 const shortText = value => typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(value);
+
+function validSignals(signals) {
+  if (!exactKeys(signals, ['source', 'region', 'network', 'hour'])
+    || !Number.isInteger(signals.hour) || signals.hour < 0 || signals.hour > 23) return false;
+  // No connection evidence: keep the contract's unknown values, never infer a normal location.
+  if (signals.source === 'none') {
+    return signals.region === 'unknown' && signals.network === 'unknown';
+  }
+  // Engine-provided synthetic evidence is for practice, not proof of a real location.
+  if (signals.source === 'judge_fixture') {
+    return shortText(signals.region) && shortText(signals.network)
+      && signals.region !== 'unknown' && signals.network !== 'unknown';
+  }
+  return false;
+}
 
 function allowedRoute(request) {
   if(request.service !== 'notes') return false;
@@ -38,15 +53,21 @@ function normalRequest(request, now) {
     && Array.isArray(request.recentEvents) && request.recentEvents.length<=12
     && request.recentEvents.every(e=>exactKeys(e,['kind','ageSeconds','count']) && shortText(e.kind)
       && Number.isFinite(e.ageSeconds) && e.ageSeconds>=0 && Number.isInteger(e.count) && e.count>=0)
-    && exactKeys(request.signals,['source','region','network','hour'])
-    && ['none','judge_fixture'].includes(request.signals.source)
-    && shortText(request.signals.region) && shortText(request.signals.network)
-    && Number.isInteger(request.signals.hour) && request.signals.hour>=0 && request.signals.hour<=23;
+    && validSignals(request.signals);
 }
 // Preserve the existing denial for requests outside the normal allow rule.
 function starterDeny(request) {
   return {schema:'aleph.decision.v1',requestId:request?.requestId,decision:'deny',
     reasonCode:'starter_not_ready',ruleIds:['starter.deny']};
+}
+function requiresStepUp(request) {
+  // Synthetic practice signals only; region alone never determines this decision.
+  return request.signals.source === 'judge_fixture'
+    && request.method === 'GET'
+    && (request.signals.hour < 6 || request.signals.hour >= 23)
+    && request.signals.network === 'unusual'
+    && request.recentEvents.some(event => event.kind === 'risk_signal'
+      && event.ageSeconds <= 120 && event.count >= 20);
 }
 export function createBaseDecider({now=()=>Date.now()}={}) {
   return async request => {
@@ -54,10 +75,13 @@ export function createBaseDecider({now=()=>Date.now()}={}) {
       return {schema:'aleph.decision.v1',requestId:request?.requestId,decision:'deny',
         reasonCode:'device_not_registered',ruleIds:['device_registered']};
     }
-    return normalRequest(request,now())
-      ? {schema:'aleph.decision.v1',requestId:request.requestId,decision:'allow',
-        reasonCode:'approved',ruleIds:['verified_request.allow','device_registered']}
-      : starterDeny(request);
+    if (!normalRequest(request, now())) return starterDeny(request);
+    if (requiresStepUp(request) && request.stepUp.verified !== true) {
+      return {schema:'aleph.decision.v1',requestId:request.requestId,decision:'step_up',
+        reasonCode:'step_up_required',ruleIds:['device_registered','step_up_required']};
+    }
+    return {schema:'aleph.decision.v1',requestId:request.requestId,decision:'allow',
+      reasonCode:'approved',ruleIds:['verified_request.allow','device_registered']};
   };
 }
 const baseDecide = createBaseDecider();

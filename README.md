@@ -2,6 +2,18 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
+## 7단계 저장점
+
+2026-10-13 docs/DECIDER_REQUEST.md와 제공된 서버·시험 코드를 확인했습니다. stepUp의 verified·authAgeSeconds 형식은 있지만, 같은 로그인 주체가 추가 확인 요청 이후 다시 로그인했음을 검증하고 자료 요청을 재개하는 엔진 절차는 제공된 파일에서 확인되지 않았습니다. 이 두 값만으로 실제 재로그인 연결 완료를 기록하지 않습니다.
+
+가상 신호 judge_fixture에서 GET 요청·23~05시·unusual 네트워크·최근 120초 내 risk_signal 20건 이상이 함께 나타나면 step_up·step_up_required를 반환합니다. 지역 하나만으로 영구 차단하지 않고 기존 device_registered 거부를 먼저 유지합니다. 접속 정보의 누락·불명확한 출처를 정상값으로 채우지 않습니다.
+
+npm run fixture:7 실행 결과는 정상 사건 allow, 복합 이상 사건 step_up입니다. npm run decider:test에서는 등록 정상 요청, 미등록 기기 거부, 복합 사건 추가 확인, 가상 stepUp 확인 후 허용 네 항목이 통과했습니다. 가상 verified 입력을 이용한 연습이며 실제 재로그인 시각 확인 증거가 아닙니다.
+
+설정의 step은 7이며 기존 배포 주소·발급자·허용 경로·원본 API·judgeIssuer를 유지합니다. 다시 실행: `npm run fixture:7` 및 `npm run decider:test`.
+
+실제 자료 차단과 새 로그인 뒤 자료 요청 재판정은 미실행입니다. 자료실 API·로그인 화면은 변경하지 않았고 토큰 원문은 기록하지 않았습니다.
+
 ## 6단계 저장점
 
 src/decider.mjs의 device_registered 규칙은 엔진이 전달한 request.deviceRegistered가 true인 요청만 기존 판정으로 진행시킵니다. false이거나 값이 없으면 deny·device_not_registered와 규칙 ID device_registered를 반환합니다. 등록 기기라도 기존 신원·요청 형식·허용 경로 검사를 통과해야 허용됩니다. 인증서·CA·서명 키를 새로 만들지 않았습니다.
@@ -21,7 +33,7 @@ read-alerts.mjs는 다섯 항목만 추출하고 비밀값처럼 보이는 내�
 
 respond.mjs는 decide의 명확한 차단 후보만 15분 만료·근거 경보 번호를 가진 주소 거부 규칙으로 저장하고 xdr/alerts.log에 한 줄씩 기록합니다. 정상 이벤트가 함께 있는 공유 주소는 차단 대신 알림으로 낮춥니다. 실제 src/decider.mjs 기본 판정기에 거부 검사만 추가하는 createConnectedDecider를 제공하며 기존 로그인 공격 검사 뒤에 연결할 수도 있습니다. 기존 기본 규칙·로그인 공격 모듈·원본 경보·자료실 기능을 변경하지 않았습니다.
 
-실제 기본 판정기에 로그인 공격 검사와 웹 주입 검사를 연결한 로컬 재생 시험: 명확한 공격 8건 거부, 애매한 시도 9건 알림 및 통과, 정상 9건 통과. 만료 해제·공유 주소 보호·기존 거부 유지·민감한 원문을 로그에 남기지 않는 검사 2건이 통과했습니다. 학습용 재생 결과이며 실제 운영 공격 차단이나 심판 통과 결과가 아닙니다. 과거 경보로 만든 현재 활성 웹 주입 규칙은 0건입니다. 웹 주입 검사 부품을 만들었으며 자료실 서버의 기존 XDR 검사 경로는 변경하지 않았습니다.
+실제 기본 판정기에 로그인 공격 검사와 웹 주입 검사를 연결한 로컬 재생 시험: 명확한 공격 8건 거부, 애매한 시도 9건 알림 및 통과, 정상 9건 통과. 만료 해제·공유 주소 보호·기존 거부 유지·민감한 원문을 로그에 남기지 않는 검사 2건이 통과했습니다. 학습용 재생 결과이며 실제 운영 공격 차단이나 심판 통과 결과가 아닙니다. 과거 경보로 만든 해당 시험 시점의 활성 웹 주입 규칙은 0건입니다. 웹 주입 검사 부품을 만들었으며 자료실 서버의 기존 XDR 검사 경로는 변경하지 않았습니다.
 
 다시 실행: `npm run xdr:run -- web-injection`. 연결 시험: `node --test test/xdr-web-respond.test.mjs`. 결과 counts와 판정 배열의 건수가 같고 정상 이벤트는 record여야 합니다.
 
@@ -46,7 +58,7 @@ connected-decider.mjs는 실제 src/decider.mjs의 기본 판단에 XDR 거부 �
 - respond.mjs는 주소·계정별 3분 시간창으로 중복 경보 번호를 제외해 집계한 뒤 같은 decide 함수를 호출합니다. 입력 count는 겹치지 않는 실패 묶음이어야 하며 누적 집계 경보는 먼저 정규화해야 합니다. 명확한 후보만 15분 만료형 IP 거부 규칙으로 저장하고 근거 경보 번호를 기록합니다. 정상 로그인 근거가 있는 공유 주소는 차단 대신 알림으로 낮춥니다.
 - src/xdr-gate.mjs를 로그인 /api/auth와 메모 /api/notes 및 /api/notes/:id 서버 경로에 연결했습니다. Vercel 환경의 x-vercel-forwarded-for 주소만 사용하며 브라우저 본문·일반 전달 헤더를 주소 근거로 사용하지 않습니다. 로컬에서는 TCP 연결 주소만 사용합니다. 기존 로그인·소유자 검사를 유지하며, src/decider.mjs에는 정상 허용 규칙을 추가하고 기존 starter.deny를 조건 불충족 요청의 거부 규칙으로 보존합니다.
 - 운영용 live 규칙만 서버가 검사합니다. 차단 시 403 JSON XDR_BLOCKED, 정상 주소는 기존 서버 검사로 진행하며, 활성 규칙이 없으면 X-XDR-Check: no-active-rules 응답 헤더를 붙입니다. 시험용 replay 규칙은 배포에 포함하지 않습니다.
-- 현재 가상 경보는 과거 시각이므로 배포용 deny-rules.json은 rules: []입니다. 규칙 파일은 배포에 포함되는 스냅샷입니다. 새로운 규칙을 배포에 반영하려면 신뢰할 수 있는 경보로 respond를 실행하고 검토 후 재배포해야 합니다. 실행 중인 Vercel의 파일을 수정하거나 Wazuh 실시간 수집이 연결됐다고 기록하지 않습니다.
+- 시험에 사용한 가상 경보는 과거 시각이므로 배포용 deny-rules.json은 rules: []입니다. 규칙 파일은 배포에 포함되는 스냅샷입니다. 새로운 규칙을 배포에 반영하려면 신뢰할 수 있는 경보로 respond를 실행하고 검토 후 재배포해야 합니다. 실행 중인 Vercel의 파일을 수정하거나 Wazuh 실시간 수집이 연결됐다고 기록하지 않습니다.
 - 로컬 검증: 읽기 28건=28행, result.json block 10/alert 9/record 9, 정상 오차단 0건. 재생 연결에서 공격 10건 거부·애매 9건 및 정상 9건 통과, 공유 주소 보호·만료 해제 통과. 서버 경로 시험에서 차단 주소가 Auth/DB에 도달하지 않고 정상 CRUD와 미로그인 401이 유지됨을 확인했습니다. 이 결과는 가상 입력과 상위 서버 대체 시험이며 실제 공격 트래픽 차단 증거가 아닙니다.
 - connected-decider.mjs는 실제 기본 판정기의 정상 허용을 유지하고 공격 주소만 추가로 거부합니다. 실제 기본 판정기 연결 재생이 통과했으며, 외부 연결은 이번 과제의 완료 기준에서 제외합니다.
 
@@ -62,7 +74,7 @@ connected-decider.mjs는 실제 src/decider.mjs의 기본 판단에 XDR 거부 �
 다시 실행: `npm run build -- --local`. 배포 후 로그인 → 자기 메모 CRUD → 새로고침 → 로그아웃을 확인하세요. 틀린 비밀번호는 화면 오류, 상대 메모는 404, 미로그인 메모 요청은 401 JSON이어야 합니다. 로그인 실패가 새 서버 경로 때문에 발생하면 이 로그인 변경만 되돌립니다. 2026-10-11 사용자 브라우저 확인: 실제 배포에서 메모 읽기·추가·수정·삭제가 정상 동작함을 확인했습니다. 이 결과는 사용자 확인이며 도구의 모의 검증과 구분합니다.
 
 
-저장점 확인: step 5, 메모 allowedRoutes 5개, originalApiUrl의 쿼리 없는 HTTPS 경로, Supabase identityProvider와 기존 judgeIssuer를 확인했습니다. Auth 중계와 화면 세션·CRUD·로그아웃 모의 검증은 통과했고 앞선 코드 변경 배포의 READY를 확인했습니다. 현재 배포의 보안 헤더·aleph.json 직접 응답과 정적 메모 문장 검색은 도구로 재확인하지 못했습니다. src/attack-check.mjs는 아직 1단계용이며 npm run bundle은 실행하지 않았습니다. 아래 이전 단계의 미확인 기록은 당시 상태이며 현재 CRUD 확인 결과는 위 사용자 확인 기록을 따릅니다.
+저장점 확인: step 5, 메모 allowedRoutes 5개, originalApiUrl의 쿼리 없는 HTTPS 경로, Supabase identityProvider와 기존 judgeIssuer를 확인했습니다. Auth 중계와 화면 세션·CRUD·로그아웃 모의 검증은 통과했고 앞선 코드 변경 배포의 READY를 확인했습니다. 해당 단계 배포의 보안 헤더·aleph.json 직접 응답과 정적 메모 문장 검색은 도구로 재확인하지 못했습니다. src/attack-check.mjs는 아직 1단계용이며 npm run bundle은 실행하지 않았습니다. 아래 이전 단계의 미확인 기록은 당시 상태이며 5단계 CRUD 확인 결과는 위 사용자 확인 기록을 따릅니다.
 
 ## 4단계 저장점 (과거 기록)
 
@@ -72,14 +84,14 @@ connected-decider.mjs는 실제 src/decider.mjs의 기본 판단에 XDR 거부 �
 - 적용 전후 information_schema.role_table_grants와 has_table_privilege 확인: anon은 모든 테이블 권한 없음, authenticated는 SELECT·INSERT·UPDATE·DELETE만 허용하며 TRUNCATE·REFERENCES·TRIGGER는 거부됩니다. 다른 테이블은 변경하지 않았습니다.
 - aleph.config.json의 step 4, 실제 배포 주소, Supabase issuer·authenticated audience·JWKS, GET·POST·PUT·DELETE 경로를 구현과 대조했습니다. judgeIssuer와 판정기의 starter.deny 규칙은 유지합니다.
 - 최신 API 코드의 모의 시험에서 A/B 자신의 CRUD 허용, 상대 단건 GET·PUT·DELETE 404, 소유자 위조 무시, 미로그인 목록 401 JSON을 확인했습니다. 사용자는 B에서 A UUID 조회가 거부되는 화면을 확인했습니다. 실제 배포 A/B 전체 CRUD는 미확인입니다.
-- 빌드 스크립트는 public/data.json만 제거하고 배포 시 public/aleph.json을 생성합니다. vercel.json의 전체 경로 nosniff 설정을 확인했습니다. 현재 배포의 직접 HTTP 확인은 실행 환경 접근 차단으로 미확인입니다.
+- 빌드 스크립트는 public/data.json만 제거하고 배포 시 public/aleph.json을 생성합니다. vercel.json의 전체 경로 nosniff 설정을 확인했습니다. 해당 단계 배포의 직접 HTTP 확인은 실행 환경 접근 차단으로 미확인입니다.
 - 서버 비밀키는 RLS를 우회할 수 있으므로 API 소유자 검사를 유지해야 합니다. 최신 정적 파일·배포 자산의 네 메모 문장 검색은 미확인입니다. 옛 공개 커밋·배포에 남은 자료가 회수되었다고 단정하지 않습니다.
 - 제출 묶음은 이번 저장점에서 실행하지 않았습니다. src/attack-check.mjs는 여전히 1단계용이며 후속 제출 전 갱신이 필요합니다.
 
-현재 주소: https://choi-bujang-secret-vault-mocha.vercel.app
+해당 단계의 주소: https://choi-bujang-secret-vault-mocha.vercel.app
 다시 실행: `npm run build -- --local`. 배포 화면에서 A/B 각각 로그인 → 자기 메모 목록 → 추가 → UUID 불러오기 → 수정 → 삭제를 확인합니다. 상대 UUID의 읽기·수정·삭제는 404, 미로그인 /api/notes는 401 JSON이어야 합니다. 로그아웃하면 화면 메모가 사라져야 합니다.
 
-아래 1~3단계 내용은 당시의 작업 기록이며 현재 상태는 위 4단계 기록을 따릅니다.
+아래 1~3단계 내용은 당시의 작업 기록이며 위 내용은 4단계 기록입니다.
 
 ## 3단계 저장점 (과거 기록)
 
@@ -88,9 +100,9 @@ connected-decider.mjs는 실제 src/decider.mjs의 기본 판단에 XDR 거부 �
 - step은 3이며 실제 저장소·배포 주소, Supabase 발급자·대상·JWKS 주소와 GET·POST·PUT·DELETE 경로를 설정과 대조했습니다. judgeIssuer 및 기존 판정기 starter.deny 규칙은 유지합니다.
 - 기존 가상 메모 네 건의 소유자를 A로 바꾸거나 A 목록에 강제로 표시하는 작업은 이번 저장점에 포함하지 않습니다. 기존 DB 자료는 보존하며 원래 소유자에 맞춰 목록을 표시합니다.
 - 단건 소유자 검사는 아직 없습니다. B가 A의 UUID를 알면 조회·수정·삭제할 수 있으며 4단계에서 보완합니다. 옛 공개 커밋·배포의 과거 노출도 해소되었다고 단정하지 않습니다.
-- API·화면 모의 시험과 DB UUID 보존 확인을 수행했습니다. 실제 A/B 계정의 전체 CRUD와 현재 배포 응답·메모 문장 검색은 미확인입니다. src/attack-check.mjs는 아직 1단계용이며 제출 묶음은 생성하지 않았습니다.
+- API·화면 모의 시험과 DB UUID 보존 확인을 수행했습니다. 실제 A/B 계정의 전체 CRUD와 해당 단계의 배포 응답·메모 문장 검색은 미확인입니다. src/attack-check.mjs는 아직 1단계용이며 제출 묶음은 생성하지 않았습니다.
 
-현재 주소: https://choi-bujang-secret-vault-mocha.vercel.app
+해당 단계의 주소: https://choi-bujang-secret-vault-mocha.vercel.app
 다시 실행: `npm run build -- --local`. 화면 새로고침 → 로그인 → 새 가상 메모 추가 → 수정 → 삭제 순서로 확인합니다. 미로그인 /api/notes는 401 JSON, 삭제된 UUID의 GET은 404여야 합니다. /aleph.json 생성과 nosniff 설정은 유지합니다.
 
 ## 3단계 진행: 가상 메모 CRUD
@@ -115,9 +127,9 @@ connected-decider.mjs는 실제 src/decider.mjs의 기본 판단에 XDR 거부 �
 
 ## 3단계 진행: 자료 API 토큰 검증 (이전 작업 기록)
 
-현재 /api/notes는 기존 src/verify-login.mjs의 createLoginVerifier로 Authorization 토큰을 검사합니다. 토큰이 없거나 검증에 실패하면 HTTP 401과 LOGIN_REQUIRED만 반환하고 자료를 읽지 않습니다. 브라우저가 보낸 userId·role은 사용하지 않습니다. 로그인 SDK의 세션 토큰만 요청 헤더에 보내며 로그아웃 즉시 화면의 메모를 지웁니다.
+3단계 당시 /api/notes는 기존 src/verify-login.mjs의 createLoginVerifier로 Authorization 토큰을 검사합니다. 토큰이 없거나 검증에 실패하면 HTTP 401과 LOGIN_REQUIRED만 반환하고 자료를 읽지 않습니다. 브라우저가 보낸 userId·role은 사용하지 않습니다. 로그인 SDK의 세션 토큰만 요청 헤더에 보내며 로그아웃 즉시 화면의 메모를 지웁니다.
 
-aleph.config.json은 step 3이고 identityProvider에는 Supabase issuer·authenticated audience·JWKS 공개 주소만 기록했습니다. judgeIssuer는 유지했습니다. 현재 목록은 로그인 사용자 소유 메모만 반환하며, 단건 소유자 검사는 아직 구현하지 않았습니다.
+aleph.config.json은 step 3이고 identityProvider에는 Supabase issuer·authenticated audience·JWKS 공개 주소만 기록했습니다. judgeIssuer는 유지했습니다. 3단계 당시 목록은 로그인 사용자 소유 메모만 반환하며, 단건 소유자 검사는 아직 구현하지 않았습니다.
 
 확인 방법: 사이트 새로고침 → A 로그인 시 A 소유 메모 목록 표시 → 로그아웃 시 메모 제거. 비로그인 /api/notes 직접 요청은 401이어야 합니다. 모의 검증에서 API 거부·허용 분기를 확인했으며 실제 A 계정과 실배포 응답 검증은 미확인입니다. 아래 1~2단계 기록은 과거 상태입니다.
 
@@ -127,9 +139,9 @@ aleph.config.json은 step 3이고 identityProvider에는 Supabase issuer·authen
 2. 방어전 1단계 카드의 **Deploy** 버튼을 누릅니다. Vercel에 GitHub로 로그인하고, 새 저장소가 **본인 계정의 Public 저장소**인지 확인한 뒤 Deploy를 누릅니다.
 3. 배포가 끝나면 화면에 나온 `https://…vercel.app` 주소를 방어전 1단계 카드에 붙여넣고 제출합니다. 저장소 주소나 설정 파일은 적지 않습니다.
 
-1단계에서는 `/data.json`으로 가상 메모가 공개되었습니다. 현재 2단계는 `/` 화면이 `/api/notes`를 호출하고 서버가 Supabase의 `learning_notes`에서 가상 메모 ID 1–4를 읽습니다. `/data.json`은 더 이상 배포하지 않습니다. 접수와 심판 판정은 포털에서 확인합니다.
+1단계에서는 `/data.json`으로 가상 메모가 공개되었습니다. 2단계 당시에는 `/` 화면이 `/api/notes`를 호출하고 서버가 Supabase의 `learning_notes`에서 가상 메모 ID 1–4를 읽습니다. `/data.json`은 더 이상 배포하지 않습니다. 접수와 심판 판정은 포털에서 확인합니다.
 
-## 현재 2단계 실행과 보안 한계
+## 2단계 당시 실행과 보안 한계
 
 Vercel 프로젝트 Settings → Environment Variables의 비밀 입력란에 `SUPABASE_URL`과 `SUPABASE_SECRET_KEY`를 직접 설정한 뒤 해당 환경으로 다시 배포하세요. 실제 값은 코드, Git, 브라우저 파일, 로그, 응답, 제출 묶음에 넣지 않습니다. 서버는 키를 환경변수에서만 읽고, 응답에는 가상 메모의 `id`, `title`, `content`만 반환합니다. 소유자 ID와 원본 오류는 반환하지 않습니다.
 
@@ -140,12 +152,12 @@ Vercel 프로젝트 Settings → Environment Variables의 비밀 입력란에 `S
 기존 `src/attack-check.mjs`는 1단계 전용이며 2단계 자기 점검은 아직 구현하지 않았습니다. 로컬 시험이나 배포 확인을 심판 판정으로 해석하지 않습니다.
 
 
-## 최신 파일과 현재 배포의 메모 문장 확인 절차
+## 최신 파일과 해당 단계 배포의 메모 문장 확인 절차
 
-이 절차는 **현재 확인한 커밋과 배포의 정적 파일**에 가상 메모 본문이 포함되어 있는지 확인합니다. 화면에 카드 네 개가 보이는 것은 서버 API가 반환한 결과이며, 정적 파일에 본문이 들어 있다는 뜻은 아닙니다. 실제 메모 문장을 README, 검색 예시, Git, 제출 묶음이나 공유 로그에 복사하지 마세요.
+이 절차는 **확인 대상 커밋과 배포의 정적 파일**에 가상 메모 본문이 포함되어 있는지 확인합니다. 화면에 카드 네 개가 보이는 것은 서버 API가 반환한 결과이며, 정적 파일에 본문이 들어 있다는 뜻은 아닙니다. 실제 메모 문장을 README, 검색 예시, Git, 제출 묶음이나 공유 로그에 복사하지 마세요.
 
-1. GitHub 저장소의 최신 `main` 커밋 SHA를 기록합니다. Vercel에서 그 커밋의 배포가 `READY`인지 확인한 뒤 현재 배포 주소의 `/aleph.json`을 열어 `commit`이 같은 SHA이고 `step`이 2인지 확인합니다. 서로 다르면 같은 버전을 확인한 것으로 기록하지 않습니다.
-2. 다른 작업을 보존하기 위해 새 폴더에 최신 저장소를 내려받습니다. 그 폴더에서 `git rev-parse HEAD`로 SHA를 확인하고, 가상 메모 네 건의 본문에서 식별 가능한 문장을 하나씩 선택해 각 문장을 아래 명령으로 검색합니다. 이는 현재 HEAD의 추적 파일 전체를 검색하며 Git 이력은 검색하지 않습니다. 입력 문장은 명령 자체나 Git 파일에 넣지 않고, 일치한 문장 본문도 출력하지 않습니다.
+1. GitHub 저장소의 최신 `main` 커밋 SHA를 기록합니다. Vercel에서 그 커밋의 배포가 `READY`인지 확인한 뒤 해당 단계의 배포 주소의 `/aleph.json`을 열어 `commit`이 같은 SHA이고 `step`이 2인지 확인합니다. 서로 다르면 같은 버전을 확인한 것으로 기록하지 않습니다.
+2. 다른 작업을 보존하기 위해 새 폴더에 최신 저장소를 내려받습니다. 그 폴더에서 `git rev-parse HEAD`로 SHA를 확인하고, 가상 메모 네 건의 본문에서 식별 가능한 문장을 하나씩 선택해 각 문장을 아래 명령으로 검색합니다. 이는 확인 대상 HEAD의 추적 파일 전체를 검색하며 Git 이력은 검색하지 않습니다. 입력 문장은 명령 자체나 Git 파일에 넣지 않고, 일치한 문장 본문도 출력하지 않습니다.
 
    ```bash
    IFS= read -r -p '검색할 가상 메모 문장: ' note_sentence
@@ -156,13 +168,13 @@ Vercel 프로젝트 Settings → Environment Variables의 비밀 입력란에 `S
    ```
 
    파일명이 출력되면 해당 최신 파일에 문장이 남아 있는 것입니다. `git grep`의 종료 코드 1은 일치 없음이며, 1 이외의 오류는 검색 완료로 기록하지 않습니다. 네 메모 모두 검색해야 합니다.
-3. 현재 배포 화면에서 브라우저 개발자 도구 → Network를 열고 캐시를 끈 뒤 새로고침합니다. 메모 카드 네 개가 표시되고 `/api/notes` 요청이 성공하는지 확인합니다. 공개 키를 이용한 별도 요청의 판정은 심판 확인 범위입니다.
+3. 해당 단계의 배포 화면에서 브라우저 개발자 도구 → Network를 열고 캐시를 끈 뒤 새로고침합니다. 메모 카드 네 개가 표시되고 `/api/notes` 요청이 성공하는지 확인합니다. 공개 키를 이용한 별도 요청의 판정은 심판 확인 범위입니다.
 4. 같은 배포의 `/data.json`을 직접 엽니다. **HTTP 404이며 가상 메모가 없어야 합니다.** 빈 화면만으로 판정하지 말고 Network에서 상태 코드와 응답 본문을 함께 확인합니다. 403, 로그인 화면, 통신 오류는 파일 제거 확인으로 인정하지 않습니다.
 5. Network의 문서(HTML), JS, CSS와 `/aleph.json` 응답을 열어 같은 네 문장을 각각 검색합니다. 추가 정적 파일과 소스맵이 있다면 그것도 확인합니다. 렌더링된 Elements 화면이나 `/api/notes` 응답에는 메모가 보이는 것이 이 단계의 정상 동작이므로 정적 파일 검색 결과와 구분합니다. 파일이 없다는 추측이나 API 응답 검색으로 정적 자산 검색을 대신하지 않습니다. JSON 이스케이프나 인코딩된 문자열은 읽을 수 있는 형태로 확인하고, 확인하지 못한 자산은 미확인으로 남깁니다.
 
-결과에는 확인 시각, 커밋 SHA, 배포 주소, 검색한 정적 파일 목록, 네 문장의 일치 유무, `/data.json` 상태 코드만 기록합니다. 메모 본문과 키는 기록하지 않습니다. 모든 항목을 실제 확인했을 때만 “확인한 최신 파일과 현재 배포의 정적 파일에서 검색한 가상 메모 문장이 발견되지 않았다”고 씁니다.
+결과에는 확인 시각, 커밋 SHA, 배포 주소, 검색한 정적 파일 목록, 네 문장의 일치 유무, `/data.json` 상태 코드만 기록합니다. 메모 본문과 키는 기록하지 않습니다. 모든 항목을 실제 확인했을 때만 “확인한 최신 파일과 해당 단계 배포의 정적 파일에서 검색한 가상 메모 문장이 발견되지 않았다”고 씁니다.
 
-최신 파일에서 삭제하거나 새 배포에서 `/data.json`을 제거해도 옛 공개 커밋과 옛 배포 URL의 자료는 자동으로 없어지지 않습니다. 옛 공개 커밋과 옛 배포가 남아 있는 한 과거 노출은 남아 있으며, 이미 복사·다운로드된 자료도 회수됐다고 단정할 수 없습니다. 현재 서버 API도 아직 공개되어 있으므로 이 확인은 전체 메모 비공개나 보안 완성을 의미하지 않습니다.
+최신 파일에서 삭제하거나 새 배포에서 `/data.json`을 제거해도 옛 공개 커밋과 옛 배포 URL의 자료는 자동으로 없어지지 않습니다. 옛 공개 커밋과 옛 배포가 남아 있는 한 과거 노출은 남아 있으며, 이미 복사·다운로드된 자료도 회수됐다고 단정할 수 없습니다. 2단계 당시 서버 API도 아직 공개되어 있으므로 이 확인은 전체 메모 비공개나 보안 완성을 의미하지 않습니다.
 
 ## 시작 틀의 자동 처리
 
@@ -180,10 +192,10 @@ Vercel 프로젝트 Settings → Environment Variables의 비밀 입력란에 `S
 
 ## 2단계 저장점
 
-현재 기능: 서버 API로 가상 메모 네 건 조회, 정적 data.json 제거, step 2 배포 식별 파일 생성, nosniff 헤더 설정. 서버 환경변수는 Vercel에만 저장합니다.
+해당 단계 기능: 서버 API로 가상 메모 네 건 조회, 정적 data.json 제거, step 2 배포 식별 파일 생성, nosniff 헤더 설정. 서버 환경변수는 Vercel에만 저장합니다.
 
 2026-10-10 사용자 브라우저 확인: /data.json은 404, /aleph.json은 step 2 및 커밋 919429268cefbdb4428c6fbc2d3a32110dfe74f7 표시, 첫 화면 응답은 nosniff 표시. 카드 네 개 표시는 앞선 사용자 확인이며 환경변수 재배포 이후 재확인은 미기록입니다. 도구의 직접 HTTP 점검은 접근 오류로 미확인입니다. 최신 파일과 배포 자산의 네 메모 문장 검색 결과는 미확인입니다. 공개 키 요청은 심판 확인 범위입니다.
 
-현재 주소: https://choi-bujang-secret-vault-mocha.vercel.app · 저장소: https://github.com/sumin003/choi-bujang-secret-vault
+해당 단계의 주소: https://choi-bujang-secret-vault-mocha.vercel.app · 저장소: https://github.com/sumin003/choi-bujang-secret-vault
 
 다시 실행: npm run build -- --local. 실제 서버 확인은 배포 주소 새로고침으로 수행합니다. 제출 묶음은 npm run bundle로 생성하며 bundle-notes.json과 artifacts/submission.json은 Git에 포함하지 않습니다. 아직 공개 API에는 로그인·권한 검증이 없으며 옛 공개 커밋과 옛 배포의 과거 노출도 남아 있습니다.
