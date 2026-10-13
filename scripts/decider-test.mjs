@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { fixtureRequests } from './fixture-7.mjs';
 
 const RESPONSE_KEYS = 'decision,reasonCode,requestId,ruleIds,schema';
@@ -51,7 +52,11 @@ export async function checkDecider({ decide, ruleIds }) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const module = await import('../src/decider.mjs');
+    // Load only the submitted source, so relative imports cannot silently rely
+    // on files present in the local repository but absent from the judge.
+    const source = readFileSync(new URL('../src/decider.mjs', import.meta.url), 'utf8');
+    const module = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+    process.stdout.write('통과 · 판정기 단독 로딩\n');
     const { RULE_IDS, decide } = module;
     const results = await checkDecider({ decide, ruleIds: RULE_IDS });
     for (const item of results) process.stdout.write(`${item.passed ? '통과' : '확인 필요'} · ${item.name}\n`);

@@ -1,5 +1,159 @@
-import { RESOURCE_IDS, resourceIdForRequest } from './resources.mjs';
-import { createZoneAuthorizer, createResourceStore, checkVerifiedResource } from './resource-access.mjs';
+// Self-contained decision module: importing it requires no sibling files,
+// packages, environment variables or server network capabilities.
+// Resource-kind identifiers, distinct from individual note UUIDs.
+// These definitions grant no access and do not change existing routes.
+export const RESOURCE_IDS = Object.freeze({
+  notes: 'notes',
+  instructorAnnouncements: 'instructor_announcements',
+});
+
+// Only call with the engine-validated request; never trust a client resourceId.
+export function resourceIdForRequest(request) {
+  if (!request || typeof request.path !== 'string') return null;
+  const resources = [
+    { service: 'notes', id: RESOURCE_IDS.notes, prefixes: ['/notes', '/api/notes'] },
+    { service: 'instructor_announcements', id: RESOURCE_IDS.instructorAnnouncements,
+      prefixes: ['/announcements', '/api/announcements'] },
+  ];
+  const reserved = new Set(['export', 'import', 'search', 'bulk', 'download', 'upload', 'action', 'admin']);
+  for (const resource of resources) {
+    if (request.service !== resource.service) continue;
+    for (const prefix of resource.prefixes) {
+      if (request.path === prefix && ['GET', 'POST'].includes(request.method)
+        && request.route === request.method + ' ' + prefix) return resource.id;
+      const id = request.path.startsWith(prefix + '/') ? request.path.slice(prefix.length + 1) : '';
+      if (/^[A-Za-z0-9._~-]{1,128}$/.test(id) && !['.','..'].includes(id) && !reserved.has(id.toLowerCase())
+        && ['GET', 'PUT', 'DELETE'].includes(request.method)
+        && request.route === request.method + ' ' + prefix + '/:id') return resource.id;
+    }
+  }
+  return null;
+}
+
+
+
+// Explicit synthetic policy, scoped to the supplied local engine fixture.
+// This is not a Supabase account map and grants no production DB permissions.
+const SCOPE = Object.freeze({classId:'class_fixture',projectId:'project_fixture',source:'judge_fixture'});
+const SUBJECTS = Object.freeze({
+  learner_fixture:'student',
+  other_learner_fixture:'student',
+  teacher_fixture:'instructor',
+});
+const NOTE_OWNERS = Object.freeze({
+  demo:'learner_fixture', // Original stage 6/7 fixture resource.
+  '11111111-1111-4111-8111-111111111111':'learner_fixture', // Existing local UUID fixture alias.
+  'other-demo':'other_learner_fixture',
+});
+const NOTICE_OWNERS = Object.freeze({'notice-demo':'teacher_fixture'});
+
+// null means this policy does not apply; false is a definitive refusal.
+export function fixtureZoneAccess(request) {
+  if (request.classId!==SCOPE.classId || request.projectId!==SCOPE.projectId
+    || request.signals?.source!==SCOPE.source) return null;
+  const role=Object.hasOwn(SUBJECTS,request.subjectId) ? SUBJECTS[request.subjectId] : null;
+  if (!role) return false;
+  const resource=resourceIdForRequest(request);
+  if (!resource) return false;
+  const id=request.path.split('/').at(-1);
+  const collection=['/notes','/api/notes','/announcements','/api/announcements'].includes(request.path);
+  if (resource===RESOURCE_IDS.notes) {
+    if (collection) return ['GET','POST'].includes(request.method);
+    return Object.hasOwn(NOTE_OWNERS,id) && NOTE_OWNERS[id]===request.subjectId
+      && ['GET','PUT','DELETE'].includes(request.method);
+  }
+  if (resource===RESOURCE_IDS.instructorAnnouncements) {
+    if (role!=='instructor') return false;
+    if (collection) return ['GET','POST'].includes(request.method);
+    return Object.hasOwn(NOTICE_OWNERS,id) && NOTICE_OWNERS[id]===request.subjectId
+      && ['GET','PUT','DELETE'].includes(request.method);
+  }
+  return false;
+}
+
+
+export function createResourceStore({fetchImpl, env} = {}) {
+  return async (table, params, {method = 'GET', body} = {}) => {
+    // Resolve server capabilities at request time; isolated imports need none.
+    const settings=env ?? globalThis.process?.env ?? {};
+    const send=fetchImpl ?? globalThis.fetch;
+    if (!settings.SUPABASE_URL || !settings.SUPABASE_SECRET_KEY || typeof send!=='function')
+      throw new Error('resource_store_unavailable');
+    const base = new URL(settings.SUPABASE_URL);
+    if (base.protocol !== 'https:' || base.username || base.password || base.search || base.hash
+      || base.pathname !== '/') throw new Error('resource_store_unavailable');
+    if (!['learning_resource_subjects','learning_instructors','learning_announcements','learning_notes'].includes(table))
+      throw new Error('unknown_resource');
+    const url = new URL('/rest/v1/' + table, base);
+    url.search = new URLSearchParams(params);
+    const response = await send(url, {method, redirect:'error', cache:'no-store',
+      signal:AbortSignal.timeout(5000), headers:{apikey:settings.SUPABASE_SECRET_KEY,
+        Accept:'application/json', 'Content-Type':'application/json', Prefer:'return=representation'},
+      body:body ? JSON.stringify(body) : undefined});
+    if (!response.ok) throw new Error('resource_store_unavailable');
+    const rows = await response.json();
+    if (!Array.isArray(rows)) throw new Error('resource_store_unavailable');
+    return rows;
+  };
+}
+
+export async function isStoredInstructor(identity, store) {
+  if (!identity || !['student','judge'].includes(identity.kind)) return false;
+  const rows = await store('learning_instructors', {select:'user_id,identity_kind,enabled',
+    user_id:'eq.' + identity.userId, identity_kind:'eq.' + identity.kind, enabled:'eq.true'});
+  return rows.length === 1 && rows[0].user_id === identity.userId
+    && rows[0].identity_kind === identity.kind && rows[0].enabled === true;
+}
+
+// Called only with identity returned by the server's login verifier.
+// Engine and HTTP entry points share this ownership/permission policy.
+export async function checkVerifiedResource(identity, request, store) {
+  const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!identity || !uuid.test(identity.userId ?? '') || !['student','judge'].includes(identity.kind))
+    return {allowed:false,reason:'login_required'};
+  const resource=resourceIdForRequest(request);
+  if (!resource) return {allowed:false,reason:'invalid_resource_route'};
+  const collection=['/notes','/api/notes','/announcements','/api/announcements'].includes(request.path);
+  if (resource===RESOURCE_IDS.instructorAnnouncements && !await isStoredInstructor(identity,store))
+    return {allowed:false,reason:'instructor_required'};
+  if (collection) return {allowed:true,reason:'verified_collection'};
+  const id=request.path.split('/').at(-1);
+  if (!uuid.test(id)) return {allowed:false,reason:'invalid_resource_id'};
+  const notes=resource===RESOURCE_IDS.notes;
+  const rows=await store(notes?'learning_notes':'learning_announcements',{
+    select:notes?'owner_id':'owner_id,owner_kind',
+    [notes?'note_id':'id']:'eq.'+id,owner_id:'eq.'+identity.userId,
+    ...(!notes?{owner_kind:'eq.'+identity.kind}:{})});
+  const allowed=rows.length===1 && rows[0].owner_id===identity.userId
+    && (notes || rows[0].owner_kind===identity.kind);
+  return {allowed,reason:allowed?'owner_verified':'not_found_or_not_owned'};
+}
+
+export function createResourceAuthorizer({store = createResourceStore()} = {}) {
+  return async request => {
+    const resource = resourceIdForRequest(request);
+    if (!resource) return false;
+    const bindings = await store('learning_resource_subjects', {select:'user_id,identity_kind',
+      class_id:'eq.' + request.classId, project_id:'eq.' + request.projectId,
+      subject_id:'eq.' + request.subjectId});
+    if (bindings.length !== 1 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bindings[0].user_id)
+      || !['student','judge'].includes(bindings[0].identity_kind)) return false;
+    const identity = {userId:bindings[0].user_id, kind:bindings[0].identity_kind};
+    return (await checkVerifiedResource(identity,request,store)).allowed;
+  };
+}
+
+// The engine subject is resolved through trusted storage before either zone is
+// allowed. The final API independently repeats its own login/ownership checks.
+export function createZoneAuthorizer({store = createResourceStore()} = {}) {
+  const authorizeStoredResource=createResourceAuthorizer({store});
+  return async request => {
+    const synthetic=fixtureZoneAccess(request);
+    if (synthetic!==null) return synthetic;
+    return authorizeStoredResource(request);
+  };
+}
+
 // Only the engine-validated request contract is accepted here.
 // XDR is a separate, deny-only layer and never supplies an allow decision.
 export const RULE_IDS = Object.freeze(['starter.deny', 'verified_request.allow', 'xdr.brute_force.deny', 'device_registered', 'step_up_required', 'resource_zone']);

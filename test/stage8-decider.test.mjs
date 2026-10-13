@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { decide } from '../src/decider.mjs';
 import { fixtureRequests } from '../scripts/fixture-7.mjs';
 
@@ -68,4 +70,42 @@ test('device and step-up rules precede final access',async()=>{
 test('synthetic policy cannot be promoted to an unrelated class or project',async()=>{
   for(const patch of [{classId:'other_class'},{projectId:'other_project'},
     {signals:{source:'none',region:'unknown',network:'unknown',hour:14}}])await expect(own(patch),'deny');
+});
+
+test('decider alone loads and evaluates without sibling modules, packages or server globals',()=>{
+  const source=readFileSync(new URL('../src/decider.mjs',import.meta.url),'utf8');
+  assert.doesNotMatch(source,/^\s*import\b/m);
+  const {normal,suspicious}=fixtureRequests();
+  const program=`
+    import {readFileSync} from 'node:fs';
+    const {source,normal,suspicious}=JSON.parse(readFileSync(0,'utf8'));
+    const emit=process.stdout.write.bind(process.stdout);
+    const url='data:text/javascript;base64,'+Buffer.from(source).toString('base64');
+    globalThis.process=undefined;
+    globalThis.fetch=undefined;
+    globalThis.URL=undefined;
+    globalThis.URLSearchParams=undefined;
+    globalThis.AbortSignal=undefined;
+    const {decide,decideAuthenticatedResource}=await import(url);
+    const cases=[normal,{...normal,subjectId:'other_learner_fixture'},
+      {...normal,deviceRegistered:false},suspicious,
+      {...suspicious,stepUp:{verified:true,authAgeSeconds:60}},
+      {...normal,path:'/notes/export'}, {...normal,classId:'unregistered_class'}];
+    const results=[];
+    for(const request of cases)results.push(await decide(request));
+    const unavailable=await decideAuthenticatedResource({
+      identity:{userId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',kind:'student'},
+      service:'notes',method:'GET',path:'/api/notes/11111111-1111-4111-8111-111111111111',
+      route:'GET /api/notes/:id'});
+    emit(JSON.stringify({results,unavailable}));
+  `;
+  const output=execFileSync(process.execPath,['--input-type=module','-e',program],{
+    input:JSON.stringify({source,normal,suspicious}),encoding:'utf8',timeout:5000});
+  const {results,unavailable}=JSON.parse(output);
+  assert.deepEqual(results.map(r=>r.decision),['allow','deny','deny','step_up','allow','deny','deny']);
+  assert.equal(results[1].ruleIds[0],'resource_zone');
+  assert.equal(results[2].reasonCode,'device_not_registered');
+  for(const r of results)assert.deepEqual(Object.keys(r).sort(),['decision','reasonCode','requestId','ruleIds','schema']);
+  assert.equal(unavailable.decision,'deny');
+  assert.equal(unavailable.reasonCode,'resource_lookup_unavailable');
 });
