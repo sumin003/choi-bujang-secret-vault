@@ -1,5 +1,5 @@
 import { RESOURCE_IDS, resourceIdForRequest } from './resources.mjs';
-import { createResourceAuthorizer } from './resource-access.mjs';
+import { createZoneAuthorizer } from './resource-access.mjs';
 // Only the engine-validated request contract is accepted here.
 // XDR is a separate, deny-only layer and never supplies an allow decision.
 export const RULE_IDS = Object.freeze(['starter.deny', 'verified_request.allow', 'xdr.brute_force.deny', 'device_registered', 'step_up_required', 'resource_zone']);
@@ -80,7 +80,7 @@ function requiresStepUp(request) {
     && request.recentEvents.some(event => event.kind === 'risk_signal'
       && event.ageSeconds <= 120 && event.count >= 20);
 }
-export function createBaseDecider({now=()=>Date.now(), authorizeResource=createResourceAuthorizer()}={}) {
+export function createBaseDecider({now=()=>Date.now(), authorizeResource=createZoneAuthorizer()}={}) {
   return async request => {
     if (request?.deviceRegistered !== true) {
       return {schema:'aleph.decision.v1',requestId:request?.requestId,decision:'deny',

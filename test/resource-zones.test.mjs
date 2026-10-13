@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {createBaseDecider} from '../src/decider.mjs';
+import {createBaseDecider,decide} from '../src/decider.mjs';
 import {createResourceAuthorizer} from '../src/resource-access.mjs';
 const A='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',B='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',I='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const N='11111111-1111-4111-8111-111111111111',C='22222222-2222-4222-8222-222222222222';
@@ -48,4 +48,21 @@ test('direct note API preserves own reads/updates/deletes and rejects another ow
  assert.equal((await call(A,'GET','/api/notes/'+N+'?action=export')).statusCode,400);
  assert.equal((await call(A,'GET')).statusCode,200);assert.equal((await call(A,'PUT')).statusCode,200);assert.equal(row.owner_id,A);assert.equal((await call(A,'DELETE')).statusCode,204);assert.equal(row,null);
  } finally {globalThis.fetch=previousFetch;if(previousUrl===undefined)delete process.env.SUPABASE_URL;else process.env.SUPABASE_URL=previousUrl;if(previousKey===undefined)delete process.env.SUPABASE_SECRET_KEY;else process.env.SUPABASE_SECRET_KEY=previousKey;}
+});
+
+test('exported default decider allows normal notes without a binding table while keeping zone/device/path refusals',async()=>{
+ const url=process.env.SUPABASE_URL,key=process.env.SUPABASE_SECRET_KEY;
+ try {
+  delete process.env.SUPABASE_URL;delete process.env.SUPABASE_SECRET_KEY;
+  assert.equal((await decide(request('A'))).decision,'allow');
+  assert.equal((await decide(request('A',true,'PUT'))).decision,'deny');
+  assert.equal((await decide({...request(),path:'/api/notes/export'})).decision,'deny');
+  assert.equal((await decide({...request(),path:'/api/other/item',route:'GET /api/other/:id'})).decision,'deny');
+  assert.equal((await decide({...request(),deviceRegistered:false})).reasonCode,'device_not_registered');
+  const risk={...request(),signals:{source:'judge_fixture',region:'foreign',network:'unusual',hour:3},recentEvents:[{kind:'risk_signal',ageSeconds:60,count:20}]};
+  assert.equal((await decide(risk)).decision,'step_up');
+ } finally {
+  if(url===undefined)delete process.env.SUPABASE_URL;else process.env.SUPABASE_URL=url;
+  if(key===undefined)delete process.env.SUPABASE_SECRET_KEY;else process.env.SUPABASE_SECRET_KEY=key;
+ }
 });

@@ -59,3 +59,17 @@ export function createResourceAuthorizer({store = createResourceStore()} = {}) {
       && (notes || rows[0].owner_kind === identity.kind);
   };
 }
+
+// The engine contract contains a pseudonymous subject, not a note owner UUID.
+// Admit valid notes-zone requests here; the final notes API independently enforces
+// the verified login UUID against owner_id in the same database statement.
+// Announcement privileges still require an operator-managed binding and role.
+export function createZoneAuthorizer({store = createResourceStore()} = {}) {
+  const authorizeStoredResource = createResourceAuthorizer({store});
+  return async request => {
+    const resource = resourceIdForRequest(request);
+    if (resource === RESOURCE_IDS.notes) return true;
+    if (resource === RESOURCE_IDS.instructorAnnouncements) return authorizeStoredResource(request);
+    return false;
+  };
+}
