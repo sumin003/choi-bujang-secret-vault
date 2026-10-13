@@ -26,27 +26,29 @@ test('trusted bindings enforce owner/instructor zones and preserve device/step-u
 test('direct announcement handler rejects students, forged roles and query actions; permits stored instructor',async()=>{
  const source=readFileSync(new URL('../api/announcements.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
  const resource=new URL('../src/resource-access.mjs',import.meta.url).href;
- const prelude=`import {createResourceStore,isStoredInstructor} from ${JSON.stringify(resource)};\nconst enforceXdr=()=>true,createLoginVerifier=()=>()=>null,config={},randomUUID=()=>${JSON.stringify(C)};\n`;
+ const deciderUrl=new URL('../src/decider.mjs',import.meta.url).href;
+ const prelude='import {decideAuthenticatedResource,exposeResourceDecision} from '+JSON.stringify(deciderUrl)+';\n'+`import {createResourceStore,isStoredInstructor} from ${JSON.stringify(resource)};\nconst enforceXdr=()=>true,createLoginVerifier=()=>()=>null,config={},randomUUID=()=>${JSON.stringify(C)};\n`;
  const {createAnnouncementHandler}=await import('data:text/javascript;base64,'+Buffer.from(prelude+source).toString('base64'));
  const handler=createAnnouncementHandler({store,verifyLogin:async user=>user?{userId:user,kind:'student'}:null});
- const call=async(user,url='/api/announcements/'+C)=>{const r={statusCode:200,setHeader(){},status(n){this.statusCode=n;return this},json(b){this.body=b;return this},end(){return this}};await handler({method:'PUT',url,headers:{authorization:user,'content-type':'application/json'},body:{title:'fixture',body:'fixture',role:'instructor',owner_id:B,owner_kind:'judge'}},r,C);return r;};
- for(const id of [A,B]){const r=await call(id);assert.equal(r.statusCode,403);assert.equal(r.body.reason,'instructor_required');assert.equal(r.body.id,undefined);}assert.equal(writes,0);
+ const call=async(user,url='/api/announcements/'+C)=>{const r={statusCode:200,headers:{},setHeader(k,v){this.headers[k]=v;},status(n){this.statusCode=n;return this},json(b){this.body=b;return this},end(){return this}};await handler({method:'PUT',url,headers:{authorization:user,'content-type':'application/json'},body:{title:'fixture',body:'fixture',role:'instructor',owner_id:B,owner_kind:'judge'}},r,C);return r;};
+ for(const id of [A,B]){const r=await call(id);assert.equal(r.statusCode,403);assert.equal(r.body.reason,'instructor_required');assert.equal(r.body.id,undefined);assert.equal(r.headers['X-Resource-Decision'],'deny');assert.equal(r.headers['X-Resource-Rule'],'resource_zone');}assert.equal(writes,0);
  assert.equal((await call(null)).statusCode,401);assert.equal((await call(I,'/api/announcements/'+C+'?action=export')).statusCode,400);
- const r=await call(I);assert.equal(r.statusCode,200);assert.deepEqual(r.body,{id:C,title:'fixture',body:'fixture'});assert.equal(writes,1);
+ const r=await call(I);assert.equal(r.statusCode,200);assert.equal(r.headers['X-Resource-Decision'],'allow');assert.equal(r.headers['X-Resource-Reason'],'owner_verified');assert.deepEqual(r.body,{id:C,title:'fixture',body:'fixture'});assert.equal(writes,1);
 });
 test('direct note API preserves own reads/updates/deletes and rejects another owner and function queries',async()=>{
  const source=readFileSync(new URL('../api/notes.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
- const prelude='const enforceXdr=()=>true,config={},randomUUID=()=>"'+N+'",createLoginVerifier=()=>async user=>({userId:user,kind:"student"});\n';
+ const deciderUrl=new URL('../src/decider.mjs',import.meta.url).href;
+ const prelude='import {decideAuthenticatedResource,exposeResourceDecision} from '+JSON.stringify(deciderUrl)+';\n'+'const enforceXdr=()=>true,config={},randomUUID=()=>"'+N+'",createLoginVerifier=()=>async user=>({userId:user,kind:"student"});\n';
  const {handleNotes}=await import('data:text/javascript;base64,'+Buffer.from(prelude+source).toString('base64'));
  const previousFetch=globalThis.fetch,previousUrl=process.env.SUPABASE_URL,previousKey=process.env.SUPABASE_SECRET_KEY;
  let row={id:N,title:'fixture',body:'fixture',owner_id:A};
  try {
  process.env.SUPABASE_URL='https://fixture.example.invalid';process.env.SUPABASE_SECRET_KEY='fixture-only';
  globalThis.fetch=async(url,o)=>{assert.equal(url.searchParams.get('note_id'),'eq.'+N);const own=url.searchParams.get('owner_id')==='eq.'+A;if(own&&o.method==='PATCH'){const p=JSON.parse(o.body);assert.equal(p.owner_id,A);row={...row,...p};}const rows=own?[{...row}]:[];if(own&&o.method==='DELETE')row=null;return {ok:true,status:200,json:async()=>rows};};
- const call=async(user,method,url='/api/notes/'+N)=>{const r={statusCode:200,setHeader(){},status(n){this.statusCode=n;return this},json(b){this.body=b;return this},end(){return this}};await handleNotes({method,url,query:{id:N},headers:{authorization:user,'content-type':'application/json'},body:{title:'own',body:'own',owner_id:B,role:'instructor'}},r,N);return r;};
- for(const method of ['GET','PUT','DELETE']){const r=await call(B,method);assert.equal(r.statusCode,404);assert.equal(r.body.id,undefined);assert.equal(row.title,'fixture');}
+ const call=async(user,method,url='/api/notes/'+N)=>{const r={statusCode:200,headers:{},setHeader(k,v){this.headers[k]=v;},status(n){this.statusCode=n;return this},json(b){this.body=b;return this},end(){return this}};await handleNotes({method,url,query:{id:N},headers:{authorization:user,'content-type':'application/json'},body:{title:'own',body:'own',owner_id:B,role:'instructor'}},r,N);return r;};
+ for(const method of ['GET','PUT','DELETE']){const r=await call(B,method);assert.equal(r.statusCode,404);assert.equal(r.headers['X-Resource-Decision'],'deny');assert.equal(r.headers['X-Resource-Rule'],'resource_zone');assert.equal(r.body.id,undefined);assert.equal(row.title,'fixture');}
  assert.equal((await call(A,'GET','/api/notes/'+N+'?action=export')).statusCode,400);
- assert.equal((await call(A,'GET','/api/notes/'+N+'?id='+N)).statusCode,200);assert.equal((await call(A,'GET','/api/notes/[id]?id='+N)).statusCode,200);assert.equal((await call(B,'GET','/api/notes/'+N+'?id='+N)).statusCode,404);assert.equal((await call(A,'GET')).statusCode,200);assert.equal((await call(A,'PUT')).statusCode,200);assert.equal(row.owner_id,A);assert.equal((await call(A,'DELETE')).statusCode,204);assert.equal(row,null);
+ assert.equal((await call(A,'GET','/api/notes/'+N+'?id='+N)).statusCode,200);assert.equal((await call(A,'GET','/api/notes/[id]?id='+N)).statusCode,200);assert.equal((await call(B,'GET','/api/notes/'+N+'?id='+N)).statusCode,404);const own=await call(A,'GET');assert.equal(own.statusCode,200);assert.equal(own.headers['X-Resource-Decision'],'allow');assert.equal(own.headers['X-Resource-Reason'],'owner_verified');assert.equal((await call(A,'PUT')).statusCode,200);assert.equal(row.owner_id,A);assert.equal((await call(A,'DELETE')).statusCode,204);assert.equal(row,null);
  } finally {globalThis.fetch=previousFetch;if(previousUrl===undefined)delete process.env.SUPABASE_URL;else process.env.SUPABASE_URL=previousUrl;if(previousKey===undefined)delete process.env.SUPABASE_SECRET_KEY;else process.env.SUPABASE_SECRET_KEY=previousKey;}
 });
 
@@ -69,7 +71,8 @@ test('exported default decider fails closed when trusted ownership bindings are 
 
 test('single-note routing permits matching dynamic id but rejects function queries and conflicting IDs',async()=>{
  const source=readFileSync(new URL('../api/notes.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
- const prelude='const enforceXdr=()=>true,config={},randomUUID=()=>null,createLoginVerifier=()=>()=>null;\n';
+ const deciderUrl=new URL('../src/decider.mjs',import.meta.url).href;
+ const prelude='import {decideAuthenticatedResource,exposeResourceDecision} from '+JSON.stringify(deciderUrl)+';\n'+'const enforceXdr=()=>true,config={},randomUUID=()=>null,createLoginVerifier=()=>()=>null;\n';
  const {resolveNoteId}=await import('data:text/javascript;base64,'+Buffer.from(prelude+source).toString('base64'));
  for(const url of ['/api/notes/'+N,'/api/notes/'+N+'?id='+N,'/api/notes/[id]?id='+N])assert.equal(resolveNoteId({url,query:{id:N}}),N);
  for(const req of [

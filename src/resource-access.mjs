@@ -30,6 +30,30 @@ export async function isStoredInstructor(identity, store) {
     && rows[0].identity_kind === identity.kind && rows[0].enabled === true;
 }
 
+// Called only with identity returned by the server's login verifier.
+// Engine and HTTP entry points share this ownership/permission policy.
+export async function checkVerifiedResource(identity, request, store) {
+  const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!identity || !uuid.test(identity.userId ?? '') || !['student','judge'].includes(identity.kind))
+    return {allowed:false,reason:'login_required'};
+  const resource=resourceIdForRequest(request);
+  if (!resource) return {allowed:false,reason:'invalid_resource_route'};
+  const collection=['/notes','/api/notes','/announcements','/api/announcements'].includes(request.path);
+  if (resource===RESOURCE_IDS.instructorAnnouncements && !await isStoredInstructor(identity,store))
+    return {allowed:false,reason:'instructor_required'};
+  if (collection) return {allowed:true,reason:'verified_collection'};
+  const id=request.path.split('/').at(-1);
+  if (!uuid.test(id)) return {allowed:false,reason:'invalid_resource_id'};
+  const notes=resource===RESOURCE_IDS.notes;
+  const rows=await store(notes?'learning_notes':'learning_announcements',{
+    select:notes?'owner_id':'owner_id,owner_kind',
+    [notes?'note_id':'id']:'eq.'+id,owner_id:'eq.'+identity.userId,
+    ...(!notes?{owner_kind:'eq.'+identity.kind}:{})});
+  const allowed=rows.length===1 && rows[0].owner_id===identity.userId
+    && (notes || rows[0].owner_kind===identity.kind);
+  return {allowed,reason:allowed?'owner_verified':'not_found_or_not_owned'};
+}
+
 export function createResourceAuthorizer({store = createResourceStore()} = {}) {
   return async request => {
     const resource = resourceIdForRequest(request);
@@ -40,24 +64,7 @@ export function createResourceAuthorizer({store = createResourceStore()} = {}) {
     if (bindings.length !== 1 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bindings[0].user_id)
       || !['student','judge'].includes(bindings[0].identity_kind)) return false;
     const identity = {userId:bindings[0].user_id, kind:bindings[0].identity_kind};
-    const parts = request.path.split('/');
-    const collection = ['notes','announcements'].includes(parts.at(-1));
-    if (resource === RESOURCE_IDS.notes && collection) return ['GET','POST'].includes(request.method);
-    if (resource === RESOURCE_IDS.instructorAnnouncements) {
-      if (!await isStoredInstructor(identity, store)) return false;
-      if (collection) return ['GET','POST'].includes(request.method);
-      if (!['GET','PUT','DELETE'].includes(request.method)) return false;
-    }
-    const id = parts.at(-1);
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return false;
-    const notes = resource === RESOURCE_IDS.notes;
-    const rows = await store(notes ? 'learning_notes' : 'learning_announcements', {
-      select:notes ? 'owner_id' : 'owner_id,owner_kind',
-      [notes ? 'note_id' : 'id']:'eq.' + id, owner_id:'eq.' + identity.userId,
-      ...(!notes ? {owner_kind:'eq.' + identity.kind} : {}),
-    });
-    return rows.length === 1 && rows[0].owner_id === identity.userId
-      && (notes || rows[0].owner_kind === identity.kind);
+    return (await checkVerifiedResource(identity,request,store)).allowed;
   };
 }
 

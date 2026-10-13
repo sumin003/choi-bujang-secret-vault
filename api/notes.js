@@ -1,6 +1,7 @@
 import { enforceXdr } from '../src/xdr-gate.mjs';
 import { randomUUID } from 'node:crypto';
 import { createLoginVerifier } from '../src/verify-login.mjs';
+import { decideAuthenticatedResource, exposeResourceDecision } from '../src/decider.mjs';
 import config from '../aleph.config.json' with { type: 'json' };
 let verifyLogin;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -71,6 +72,14 @@ export async function handleNotes(req, res, id) {
     }
   }
   try {
+    const path='/api/notes'+(id===null?'':'/'+id);
+    const zone=await decideAuthenticatedResource({identity,service:'notes',method:req.method,
+      path,route:req.method+' /api/notes'+(id===null?'':'/:id')});
+    exposeResourceDecision(res,zone);
+    if (zone.decision!=='allow') {
+      if (zone.reasonCode==='resource_lookup_unavailable') return res.status(503).json({error:'NOTES_UNAVAILABLE'});
+      return res.status(404).json({error:'NOTE_NOT_FOUND',reason:'not_found_or_not_owned'});
+    }
     const base = new URL(url);
     if (base.protocol !== 'https:' || base.username || base.password) throw new Error();
     const endpoint = new URL('/rest/v1/learning_notes', base);
@@ -103,9 +112,13 @@ export async function handleNotes(req, res, id) {
     const rows = await response.json();
     if (!Array.isArray(rows)) throw new Error();
     if (rows.some(row => row.owner_id !== identity.userId)) {
+      exposeResourceDecision(res,{...zone,decision:'deny',reasonCode:'owner_mismatch'});
       return res.status(403).json({ error: 'ACCESS_DENIED', reason: 'owner_mismatch' });
     }
-    if (id !== null && rows.length === 0) return res.status(404).json({ error: 'NOTE_NOT_FOUND', reason: 'not_found_or_not_owned' });
+    if (id !== null && rows.length === 0) {
+      exposeResourceDecision(res,{...zone,decision:'deny',reasonCode:'not_found_or_not_owned'});
+      return res.status(404).json({ error: 'NOTE_NOT_FOUND', reason: 'not_found_or_not_owned' });
+    }
     if (req.method === 'DELETE') return res.status(204).end();
     const notes = rows.map(row => {
       if (!UUID.test(row.id ?? '') || typeof row.title !== 'string' || typeof row.body !== 'string') throw new Error();

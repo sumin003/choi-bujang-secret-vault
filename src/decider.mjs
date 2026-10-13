@@ -1,5 +1,5 @@
 import { RESOURCE_IDS, resourceIdForRequest } from './resources.mjs';
-import { createZoneAuthorizer } from './resource-access.mjs';
+import { createZoneAuthorizer, createResourceStore, checkVerifiedResource } from './resource-access.mjs';
 // Only the engine-validated request contract is accepted here.
 // XDR is a separate, deny-only layer and never supplies an allow decision.
 export const RULE_IDS = Object.freeze(['starter.deny', 'verified_request.allow', 'xdr.brute_force.deny', 'device_registered', 'step_up_required', 'resource_zone']);
@@ -92,3 +92,22 @@ export function createBaseDecider({now=()=>Date.now(), authorizeResource=createZ
 }
 const baseDecide = createBaseDecider();
 export async function decide(request) { return baseDecide(request); }
+
+// Server HTTP bridge: uses the UUID already verified by createLoginVerifier.
+// It does not invent any engine identity, registration, device or step-up data.
+// This is a separate entry point, not a change to the eighteen-field engine contract.
+export async function decideAuthenticatedResource({identity,service,method,path,route},
+  {store=createResourceStore()}={}) {
+  let result;
+  try {result=await checkVerifiedResource(identity,{service,method,path,route},store);}
+  catch {result={allowed:false,reason:'resource_lookup_unavailable'};}
+  return {schema:'aleph.resource.decision.v1',decision:result.allowed?'allow':'deny',
+    reasonCode:result.reason,ruleIds:['resource_zone'],resourceId:resourceIdForRequest({service,method,path,route})};
+}
+
+// Safe observation of real server decisions: no tokens, identities or note bodies.
+export function exposeResourceDecision(res,result) {
+  res.setHeader('X-Resource-Decision',result.decision);
+  res.setHeader('X-Resource-Rule','resource_zone');
+  res.setHeader('X-Resource-Reason',result.reasonCode);
+}

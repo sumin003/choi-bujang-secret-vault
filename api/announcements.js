@@ -1,5 +1,6 @@
 import { enforceXdr } from '../src/xdr-gate.mjs';
 import { createLoginVerifier } from '../src/verify-login.mjs';
+import { decideAuthenticatedResource, exposeResourceDecision } from '../src/decider.mjs';
 import { createResourceStore, isStoredInstructor } from '../src/resource-access.mjs';
 import config from '../aleph.config.json' with {type:'json'};
 import { randomUUID } from 'node:crypto';
@@ -27,7 +28,19 @@ export function createAnnouncementHandler({store=createResourceStore(), verifyLo
     } catch { /* No token or upstream details in responses/logs. */ }
     if (!identity) return res.status(401).json({error:'LOGIN_REQUIRED'});
     try {
-      if (!await isStoredInstructor(identity,store)) return res.status(403).json({error:'ACCESS_DENIED',reason:'instructor_required'});
+      const path='/api/announcements'+(id===null?'':'/'+id);
+      const zone=await decideAuthenticatedResource({identity,service:'instructor_announcements',method:req.method,
+        path,route:req.method+' /api/announcements'+(id===null?'':'/:id')},{store});
+      exposeResourceDecision(res,zone);
+      if (zone.decision!=='allow') {
+        if (zone.reasonCode==='resource_lookup_unavailable') return res.status(503).json({error:'ANNOUNCEMENTS_UNAVAILABLE'});
+        if (zone.reasonCode==='instructor_required') return res.status(403).json({error:'ACCESS_DENIED',reason:'instructor_required'});
+        return res.status(404).json({error:'ANNOUNCEMENT_NOT_FOUND',reason:'not_found_or_not_owned'});
+      }
+      if (!await isStoredInstructor(identity,store)) {
+        exposeResourceDecision(res,{...zone,decision:'deny',reasonCode:'instructor_required'});
+        return res.status(403).json({error:'ACCESS_DENIED',reason:'instructor_required'});
+      }
       let payload;
       if (['POST','PUT'].includes(req.method)) {
         if (!/^application\/json(?:;|$)/i.test(req.headers?.['content-type'] ?? ''))
@@ -49,9 +62,14 @@ export function createAnnouncementHandler({store=createResourceStore(), verifyLo
       }
       const rows=await store('learning_announcements',params,
         {method:req.method==='PUT'?'PATCH':req.method,body:payload});
-      if (rows.some(row=>row.owner_id!==identity.userId || row.owner_kind!==identity.kind))
+      if (rows.some(row=>row.owner_id!==identity.userId || row.owner_kind!==identity.kind)) {
+        exposeResourceDecision(res,{...zone,decision:'deny',reasonCode:'owner_mismatch'});
         return res.status(403).json({error:'ACCESS_DENIED',reason:'owner_mismatch'});
-      if (id!==null && rows.length===0) return res.status(404).json({error:'ANNOUNCEMENT_NOT_FOUND',reason:'not_found_or_not_owned'});
+      }
+      if (id!==null && rows.length===0) {
+        exposeResourceDecision(res,{...zone,decision:'deny',reasonCode:'not_found_or_not_owned'});
+        return res.status(404).json({error:'ANNOUNCEMENT_NOT_FOUND',reason:'not_found_or_not_owned'});
+      }
       if (req.method==='DELETE') return res.status(204).end();
       if (rows.some(row=>!UUID.test(row.id) || typeof row.title!=='string' || typeof row.body!=='string')) throw new Error();
       const output=rows.map(({id,title,body})=>({id,title,body}));

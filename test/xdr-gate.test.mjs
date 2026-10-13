@@ -28,10 +28,11 @@ test('actual notes server keeps normal CRUD; denied source never reaches DB',asy
   process.env.SUPABASE_URL='https://fixture.supabase.co';process.env.SUPABASE_SECRET_KEY='server-test-placeholder';
   globalThis.__gate=(r,s)=>enforceXdr(r,s,{rules:[rule],now,vercel:true});
   const owner='11111111-1111-4111-8111-111111111111';
-  globalThis.__verify=()=>async()=>({userId:owner});
+  globalThis.__verify=()=>async()=>({userId:owner,kind:"student"});
   const text=(await readFile(new URL('../api/notes.js',import.meta.url),'utf8'))
     .replace("import { enforceXdr } from '../src/xdr-gate.mjs';",'const enforceXdr=globalThis.__gate;')
     .replace("import { createLoginVerifier } from '../src/verify-login.mjs';",'const createLoginVerifier=globalThis.__verify;')
+    .replace("import { decideAuthenticatedResource, exposeResourceDecision } from '../src/decider.mjs';", 'import {decideAuthenticatedResource,exposeResourceDecision} from '+JSON.stringify(new URL('../src/decider.mjs',import.meta.url).href)+';')
     .replace("import config from '../aleph.config.json' with { type: 'json' };",'const config={};');
   const {handleNotes}=await import('data:text/javascript;base64,'+Buffer.from(text).toString('base64'));
   let dbCalls=0;const rows=new Map();
