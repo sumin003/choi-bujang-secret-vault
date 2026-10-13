@@ -35,16 +35,7 @@ function allowedRoute(request) {
   const finalSegment = typeof request.path === 'string' ? request.path.split('/').at(-1) : '';
   if (['export', 'import', 'search', 'bulk', 'download', 'upload', 'action', 'admin'].includes(finalSegment.toLowerCase())) return false;
   const resource = resourceIdForRequest(request);
-  if (resource === RESOURCE_IDS.instructorAnnouncements) return true;
-  if (resource !== RESOURCE_IDS.notes) return false;
-  if(request.service !== 'notes') return false;
-  // The engine uses /notes; the application uses /api/notes. Both describe the same five routes.
-  const collection = request.path === '/notes' || request.path === '/api/notes';
-  const single = /^\/(?:api\/)?notes\/[A-Za-z0-9-]{1,128}$/.test(request.path);
-  const prefix = request.path.startsWith('/api/') ? '/api/notes' : '/notes';
-  if(collection) return ['GET','POST'].includes(request.method) && request.route === request.method+' '+prefix;
-  return single && ['GET','PUT','DELETE'].includes(request.method)
-    && request.route === request.method+' '+prefix+'/:id';
+  return resource===RESOURCE_IDS.notes || resource===RESOURCE_IDS.instructorAnnouncements;
 }
 function normalRequest(request, now) {
   if(!exactKeys(request,FIELDS))return false;

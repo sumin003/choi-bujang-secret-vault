@@ -24,6 +24,7 @@ export async function runAttackChecks(config) {
   }
   if (config.step === 8) {
     for (const [attackId, input, expected] of [
+      ['foreign_owner_local', {...normal,subjectId:'other_learner_fixture'}, '같은 가상 메모를 다른 사용자가 요청하면 deny'],
       ['foreign_zone_local', {...normal,service:'other_zone',path:'/other-zone/item',route:'GET /other-zone/:id'}, '가상 다른 구역 요청은 deny'],
       ['student_notice_local', {...normal,service:'instructor_announcements',method:'PUT',
         path:'/api/announcements/22222222-2222-4222-8222-222222222222',route:'PUT /api/announcements/:id'}, '가상 학생 공지 수정은 deny'],

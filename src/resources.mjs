@@ -20,7 +20,7 @@ export function resourceIdForRequest(request) {
       if (request.path === prefix && ['GET', 'POST'].includes(request.method)
         && request.route === request.method + ' ' + prefix) return resource.id;
       const id = request.path.startsWith(prefix + '/') ? request.path.slice(prefix.length + 1) : '';
-      if (/^[A-Za-z0-9-]{1,128}$/.test(id) && !reserved.has(id.toLowerCase())
+      if (/^[A-Za-z0-9._~-]{1,128}$/.test(id) && !['.','..'].includes(id) && !reserved.has(id.toLowerCase())
         && ['GET', 'PUT', 'DELETE'].includes(request.method)
         && request.route === request.method + ' ' + prefix + '/:id') return resource.id;
     }

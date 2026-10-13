@@ -50,17 +50,17 @@ test('direct note API preserves own reads/updates/deletes and rejects another ow
  } finally {globalThis.fetch=previousFetch;if(previousUrl===undefined)delete process.env.SUPABASE_URL;else process.env.SUPABASE_URL=previousUrl;if(previousKey===undefined)delete process.env.SUPABASE_SECRET_KEY;else process.env.SUPABASE_SECRET_KEY=previousKey;}
 });
 
-test('exported default decider allows normal notes without a binding table while keeping zone/device/path refusals',async()=>{
+test('exported default decider fails closed when trusted ownership bindings are unavailable',async()=>{
  const url=process.env.SUPABASE_URL,key=process.env.SUPABASE_SECRET_KEY;
  try {
   delete process.env.SUPABASE_URL;delete process.env.SUPABASE_SECRET_KEY;
-  assert.equal((await decide(request('A'))).decision,'allow');
+  assert.equal((await decide(request('A'))).decision,'deny');
   assert.equal((await decide(request('A',true,'PUT'))).decision,'deny');
   assert.equal((await decide({...request(),path:'/api/notes/export'})).decision,'deny');
   assert.equal((await decide({...request(),path:'/api/other/item',route:'GET /api/other/:id'})).decision,'deny');
   assert.equal((await decide({...request(),deviceRegistered:false})).reasonCode,'device_not_registered');
   const risk={...request(),signals:{source:'judge_fixture',region:'foreign',network:'unusual',hour:3},recentEvents:[{kind:'risk_signal',ageSeconds:60,count:20}]};
-  assert.equal((await decide(risk)).decision,'step_up');
+  assert.equal((await decide(risk)).decision,'deny');
  } finally {
   if(url===undefined)delete process.env.SUPABASE_URL;else process.env.SUPABASE_URL=url;
   if(key===undefined)delete process.env.SUPABASE_SECRET_KEY;else process.env.SUPABASE_SECRET_KEY=key;
@@ -80,4 +80,26 @@ test('single-note routing permits matching dynamic id but rejects function queri
   {url:'/api/notes/export',query:{id:N}},
   {url:'/api/notes/'+N,query:{id:[N,C]}},
  ])assert.equal(resolveNoteId(req),null);
+});
+
+test('actual exported decide checks stored ownership without an authorization override',async()=>{
+ const originalFetch=globalThis.fetch,url=process.env.SUPABASE_URL,key=process.env.SUPABASE_SECRET_KEY;
+ try {
+  process.env.SUPABASE_URL='https://fixture.example.invalid';process.env.SUPABASE_SECRET_KEY='fixture-only';
+  globalThis.fetch=async endpoint=>({ok:true,json:async()=>store(endpoint.pathname.split('/').at(-1),Object.fromEntries(endpoint.searchParams))});
+  const {decide:actual}=await import('../src/decider.mjs?ownership-default-test');
+  for(const method of ['GET','PUT']) {
+   assert.equal((await actual(request('A',false,method))).decision,'allow');
+   assert.equal((await actual(request('B',false,method))).decision,'deny');
+  }
+  assert.equal((await actual(request('A',true,'PUT'))).decision,'deny');
+  assert.equal((await actual(request('I',true,'PUT'))).decision,'allow');
+  assert.equal((await actual({...request(),deviceRegistered:false})).reasonCode,'device_not_registered');
+  const risk={...request(),signals:{source:'judge_fixture',region:'foreign',network:'unusual',hour:3},recentEvents:[{kind:'risk_signal',ageSeconds:60,count:20}]};
+  assert.equal((await actual(risk)).decision,'step_up');
+ } finally {
+  globalThis.fetch=originalFetch;
+  if(url===undefined)delete process.env.SUPABASE_URL;else process.env.SUPABASE_URL=url;
+  if(key===undefined)delete process.env.SUPABASE_SECRET_KEY;else process.env.SUPABASE_SECRET_KEY=key;
+ }
 });

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const request = (signals, recentEvents) => ({
   schema: 'aleph.decision.v1', requestId: randomUUID(), classId: 'class_fixture',
   projectId: 'project_fixture', subjectId: 'learner_fixture', deviceId: 'a'.repeat(16),
-  service: 'notes', method: 'GET', path: '/notes/11111111-1111-4111-8111-111111111111', route: 'GET /notes/:id',
+  service: 'notes', method: 'GET', path: '/notes/demo', route: 'GET /notes/:id',
   queryLength: 0, querySha256: createHash('sha256').update('').digest('hex'),
   at: new Date().toISOString(), policyRevision: 1, deviceRegistered: true,
   stepUp: { verified: false, authAgeSeconds: null }, recentEvents, signals,
@@ -28,9 +28,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const { normal, suspicious } = fixtureRequests();
     const module = await import('../src/decider.mjs');
-    const { fixtureAuthorize } = await import('./resource-fixture.mjs');
-    const decide = module.RULE_IDS.includes('resource_zone')
-      ? module.createBaseDecider({authorizeResource:fixtureAuthorize}) : module.decide;
+    const { decide } = module;
     if (typeof decide !== 'function') throw new Error('src/decider.mjs에서 decide 함수를 내보내야 합니다.');
     const ordinary = await decide(normal);
     const unusual = await decide(suspicious);
