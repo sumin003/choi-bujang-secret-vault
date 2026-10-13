@@ -2,6 +2,17 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
+## 6단계 저장점
+
+src/decider.mjs의 device_registered 규칙은 엔진이 전달한 request.deviceRegistered가 true인 요청만 기존 판정으로 진행시킵니다. false이거나 값이 없으면 deny·device_not_registered와 규칙 ID device_registered를 반환합니다. 등록 기기라도 기존 신원·요청 형식·허용 경로 검사를 통과해야 허용됩니다. 인증서·CA·서명 키를 새로 만들지 않았습니다.
+
+확인 순서:
+1. 저장소 루트의 터미널에서 `npm run decider:test`를 실행합니다. 이번 과정에는 따로 설치할 접속 프로그램이 없습니다.
+2. 출력의 “통과 · 등록 기기의 정상 요청”과 “통과 · 미등록 기기의 가상 요청”을 확인합니다.
+3. 등록 기기의 정상 요청은 allow·approved, 미등록 기기의 가상 요청은 deny·device_not_registered여야 합니다. 미등록 요청의 ruleIds는 ["device_registered"]입니다.
+
+2026-10-13 위 명령을 실제 실행해 두 항목 통과를 확인했고, 판정기를 직접 호출해 등록 요청 allow·approved와 미등록 요청 deny·device_not_registered를 대조했습니다. 이는 로컬 가상 요청 연습이며 실제 접속이나 심판 통과 증거가 아닙니다. 실제 미등록 기기 공격의 확인은 심판이 맡습니다. 설정의 step을 6으로 변경했고 기존 자료실 주소·브라우저 화면·로그인 발급자·허용 경로·원본 API 주소·judgeIssuer는 유지합니다. 제출 묶음의 직접 HTTP 점검은 실행 결과만 기록하며 접근 제한이나 통신 오류는 미확인으로 남깁니다. 브라우저에서 기기 상태를 위조하거나 실제 공격을 수행하는 절차는 포함하지 않습니다.
+
 ## 보너스 xdr-02 저장점
 
 2026-10-12 `npm run xdr:run -- web-injection`를 다시 실행해 xdr/web-injection/result.json을 갱신했습니다. 경보 26건의 counts는 block 8 · alert 9 · record 9이며 정상 이벤트 9건 중 block은 0건입니다. 실행 오류는 없었습니다.

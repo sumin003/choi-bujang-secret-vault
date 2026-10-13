@@ -1,6 +1,6 @@
 // Only the engine-validated request contract is accepted here.
 // XDR is a separate, deny-only layer and never supplies an allow decision.
-export const RULE_IDS = Object.freeze(['starter.deny', 'verified_request.allow', 'xdr.brute_force.deny']);
+export const RULE_IDS = Object.freeze(['starter.deny', 'verified_request.allow', 'xdr.brute_force.deny', 'device_registered']);
 const FIELDS = ['schema', 'requestId', 'classId', 'projectId', 'subjectId', 'deviceId',
   'service', 'method', 'path', 'route', 'queryLength', 'querySha256', 'at',
   'policyRevision', 'deviceRegistered', 'stepUp', 'recentEvents', 'signals'];
@@ -49,10 +49,16 @@ function starterDeny(request) {
     reasonCode:'starter_not_ready',ruleIds:['starter.deny']};
 }
 export function createBaseDecider({now=()=>Date.now()}={}) {
-  return async request => normalRequest(request,now())
-    ? {schema:'aleph.decision.v1',requestId:request.requestId,decision:'allow',
-      reasonCode:'approved',ruleIds:['verified_request.allow']}
-    : starterDeny(request);
+  return async request => {
+    if (request?.deviceRegistered !== true) {
+      return {schema:'aleph.decision.v1',requestId:request?.requestId,decision:'deny',
+        reasonCode:'device_not_registered',ruleIds:['device_registered']};
+    }
+    return normalRequest(request,now())
+      ? {schema:'aleph.decision.v1',requestId:request.requestId,decision:'allow',
+        reasonCode:'approved',ruleIds:['verified_request.allow','device_registered']}
+      : starterDeny(request);
+  };
 }
 const baseDecide = createBaseDecider();
 export async function decide(request) { return baseDecide(request); }

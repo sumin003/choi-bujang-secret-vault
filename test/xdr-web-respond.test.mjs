@@ -38,7 +38,7 @@ test('web candidates connect to real ZTNA; ambiguous and normal requests pass; o
       assert.deepEqual(Object.keys(r).sort(),['decision','reasonCode','requestId','ruleIds','schema']);
     }
     const invalid={...request(fixture.alerts[0].data.srcip),deviceRegistered:false};
-    assert.deepEqual((await connected(invalid)).ruleIds,['starter.deny']);
+    assert.deepEqual((await connected(invalid)).ruleIds,['device_registered']);
     clock=now+900001;assert.equal((await connected(request(fixture.alerts[0].data.srcip))).decision,'allow');clock=now;
     const shared={id:'wi-shared-normal',timestamp:new Date(now).toISOString(),rule:{level:3,description:'자료 목록을 조회했습니다.'},
       data:{srcip:fixture.alerts[0].data.srcip,url:'/api/notes'}};
