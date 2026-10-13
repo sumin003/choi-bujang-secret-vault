@@ -5,6 +5,24 @@ import config from '../aleph.config.json' with { type: 'json' };
 let verifyLogin;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export function resolveNoteId(req) {
+  if (typeof req.url !== 'string') return null;
+  let target;try {target=new URL(req.url,'https://request.invalid');}catch{return null;}
+  const match=/^\/api\/notes\/([^/]+)$/.exec(target.pathname);
+  if (!match) return null;
+  const routed=req.query?.id;
+  if (routed!==undefined && (typeof routed!=='string' || !UUID.test(routed))) return null;
+  const pathId=UUID.test(match[1]) ? match[1] : null;
+  const template=match[1]==='[id]' || match[1]==='[id].js';
+  const id=pathId ?? (template ? routed : null);
+  if (!id || (routed!==undefined && routed!==id)) return null;
+  // An id supplied by dynamic routing may select only that same note.
+  // No action/export query, duplicate id, or mismatched id is accepted.
+  const entries=[...target.searchParams];
+  if (entries.length>1 || entries.some(([key,value])=>key!=='id' || value!==id)) return null;
+  return id;
+}
+
 export default async function handler(req, res) {
   return handleNotes(req, res, null);
 }
@@ -15,7 +33,7 @@ export async function handleNotes(req, res, id) {
   if (!enforceXdr(req, res)) return;
   if (typeof req.url !== 'string') return res.status(400).json({error:'INVALID_ROUTE'});
   const target = new URL(req.url, 'https://request.invalid');
-  if (target.search || target.pathname !== '/api/notes' + (id === null ? '' : '/' + id))
+  if (id === null ? (target.search || target.pathname !== '/api/notes') : resolveNoteId(req) !== id)
     return res.status(400).json({error:'INVALID_ROUTE'});
   const allowed = id === null ? ['GET', 'POST'] : ['GET', 'PUT', 'DELETE'];
   if (!allowed.includes(req.method)) {

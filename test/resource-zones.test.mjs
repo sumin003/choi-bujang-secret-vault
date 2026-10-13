@@ -43,10 +43,10 @@ test('direct note API preserves own reads/updates/deletes and rejects another ow
  try {
  process.env.SUPABASE_URL='https://fixture.example.invalid';process.env.SUPABASE_SECRET_KEY='fixture-only';
  globalThis.fetch=async(url,o)=>{assert.equal(url.searchParams.get('note_id'),'eq.'+N);const own=url.searchParams.get('owner_id')==='eq.'+A;if(own&&o.method==='PATCH'){const p=JSON.parse(o.body);assert.equal(p.owner_id,A);row={...row,...p};}const rows=own?[{...row}]:[];if(own&&o.method==='DELETE')row=null;return {ok:true,status:200,json:async()=>rows};};
- const call=async(user,method,url='/api/notes/'+N)=>{const r={statusCode:200,setHeader(){},status(n){this.statusCode=n;return this},json(b){this.body=b;return this},end(){return this}};await handleNotes({method,url,headers:{authorization:user,'content-type':'application/json'},body:{title:'own',body:'own',owner_id:B,role:'instructor'}},r,N);return r;};
+ const call=async(user,method,url='/api/notes/'+N)=>{const r={statusCode:200,setHeader(){},status(n){this.statusCode=n;return this},json(b){this.body=b;return this},end(){return this}};await handleNotes({method,url,query:{id:N},headers:{authorization:user,'content-type':'application/json'},body:{title:'own',body:'own',owner_id:B,role:'instructor'}},r,N);return r;};
  for(const method of ['GET','PUT','DELETE']){const r=await call(B,method);assert.equal(r.statusCode,404);assert.equal(r.body.id,undefined);assert.equal(row.title,'fixture');}
  assert.equal((await call(A,'GET','/api/notes/'+N+'?action=export')).statusCode,400);
- assert.equal((await call(A,'GET')).statusCode,200);assert.equal((await call(A,'PUT')).statusCode,200);assert.equal(row.owner_id,A);assert.equal((await call(A,'DELETE')).statusCode,204);assert.equal(row,null);
+ assert.equal((await call(A,'GET','/api/notes/'+N+'?id='+N)).statusCode,200);assert.equal((await call(A,'GET','/api/notes/[id]?id='+N)).statusCode,200);assert.equal((await call(B,'GET','/api/notes/'+N+'?id='+N)).statusCode,404);assert.equal((await call(A,'GET')).statusCode,200);assert.equal((await call(A,'PUT')).statusCode,200);assert.equal(row.owner_id,A);assert.equal((await call(A,'DELETE')).statusCode,204);assert.equal(row,null);
  } finally {globalThis.fetch=previousFetch;if(previousUrl===undefined)delete process.env.SUPABASE_URL;else process.env.SUPABASE_URL=previousUrl;if(previousKey===undefined)delete process.env.SUPABASE_SECRET_KEY;else process.env.SUPABASE_SECRET_KEY=previousKey;}
 });
 
@@ -65,4 +65,19 @@ test('exported default decider allows normal notes without a binding table while
   if(url===undefined)delete process.env.SUPABASE_URL;else process.env.SUPABASE_URL=url;
   if(key===undefined)delete process.env.SUPABASE_SECRET_KEY;else process.env.SUPABASE_SECRET_KEY=key;
  }
+});
+
+test('single-note routing permits matching dynamic id but rejects function queries and conflicting IDs',async()=>{
+ const source=readFileSync(new URL('../api/notes.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
+ const prelude='const enforceXdr=()=>true,config={},randomUUID=()=>null,createLoginVerifier=()=>()=>null;\n';
+ const {resolveNoteId}=await import('data:text/javascript;base64,'+Buffer.from(prelude+source).toString('base64'));
+ for(const url of ['/api/notes/'+N,'/api/notes/'+N+'?id='+N,'/api/notes/[id]?id='+N])assert.equal(resolveNoteId({url,query:{id:N}}),N);
+ for(const req of [
+  {url:'/api/notes/'+N+'?action=export',query:{id:N}},
+  {url:'/api/notes/'+N+'?id='+C,query:{id:N}},
+  {url:'/api/notes/'+N+'?id='+N+'&id='+N,query:{id:N}},
+  {url:'/api/notes/'+N,query:{id:C}},
+  {url:'/api/notes/export',query:{id:N}},
+  {url:'/api/notes/'+N,query:{id:[N,C]}},
+ ])assert.equal(resolveNoteId(req),null);
 });
