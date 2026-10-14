@@ -22,6 +22,7 @@ async function fixture(t, { missing = false } = {}) {
   const content = 'service-a deny\nseparator\nservice-b deny\n';
   const trial = 'service-a allow\nseparator\nservice-b allow\n';
   const backupBytes = Buffer.from(JSON.stringify({ schema: 'aleph.policy.backup.v1', version,
+    verifiedAt: '2026-10-01T00:00:00.000Z', incidentAt: '2026-10-13T00:00:00.000Z',
     files: [{ path: 'src/decider.mjs', content }] }));
   const backupPath = join(folder, 'safe.json');
   await writeFile(backupPath, backupBytes);
@@ -188,6 +189,7 @@ test('시험 소유권 규칙을 훼손했다가 복원하면 B의 A 자료를 �
   const corrupted = safeSource.replace('NOTE_OWNERS[id]===request.subjectId', 'true');
   assert.notEqual(corrupted, safeSource);
   const backup = Buffer.from(JSON.stringify({ schema: 'aleph.policy.backup.v1', version,
+    verifiedAt: '2026-10-01T00:00:00.000Z', incidentAt: '2026-10-13T00:00:00.000Z',
     files: [{ path: 'src/decider.mjs', content: safeSource }] }));
   await writeFile(f.backupPath, backup);
   await writeFile(f.policyPath, corrupted);

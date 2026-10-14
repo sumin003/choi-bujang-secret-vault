@@ -91,6 +91,7 @@ async function checkPolicyRestoreThenAccess(){
     requireCheck(corrupted!==safeSource,'policy_fixture_failed');
     const version='1234567890abcdef1234567890abcdef12345678';
     const bytes=Buffer.from(JSON.stringify({schema:'aleph.policy.backup.v1',version,
+      verifiedAt:'2026-10-01T00:00:00.000Z',incidentAt:'2026-10-13T00:00:00.000Z',
       files:[{path:'src/decider.mjs',content:safeSource}]}));
     const backupPath=join(folder,'safe-policy.json'), policyPath=join(trialDir,'src/decider.mjs');
     await writeFile(backupPath,bytes);await writeFile(policyPath,corrupted);

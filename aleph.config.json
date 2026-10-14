@@ -21,12 +21,9 @@
     "PUT /api/announcements/:id",
     "DELETE /api/announcements/:id",
     "POST /api/restore-notes/preview",
-    "POST /api/restore-notes"
+    "POST /api/restore-notes",
+    "POST /api/restore/notes/:id"
   ],
   "originalApiUrl": "https://cysbomadvuwrqsteohuq.supabase.co/rest/v1/learning_notes",
-  "restoreRoute": {
-    "service": "notes",
-    "method": "POST",
-    "path": "/api/restore-notes"
-  }
+  "restoreRoute": "/api/restore/notes/:id"
 }

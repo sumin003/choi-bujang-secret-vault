@@ -28,18 +28,21 @@ export function createRestoreRpc({ env=process.env, fetchImpl=globalThis.fetch }
   };
 }
 
-export function createNoteRestoreHandler({ preview=false, verifyLogin, callRpc,
+export function createNoteRestoreHandler({ preview=false, pathParam=false, verifyLogin, callRpc,
   enforceRequest=enforceXdr, env=process.env }={}) {
   let verifier=verifyLogin;
   const rpc=callRpc ?? createRestoreRpc({env});
-  const path=preview?'/api/restore-notes/preview':'/api/restore-notes';
+  const path=pathParam?'/api/restore/notes/:id':preview?'/api/restore-notes/preview':'/api/restore-notes';
   return async (req,res) => {
     res.setHeader('Cache-Control','no-store');
     res.setHeader('X-Resource-Id','notes');
     if (!enforceRequest(req,res)) return;
     let target;
     try { if (typeof req.url==='string') target=new URL(req.url,'https://request.invalid'); } catch {}
-    if (!target || target.pathname!==path || target.search || target.hash)
+    const routeMatch=pathParam && target
+      ? /^\/api\/restore\/notes\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(target.pathname)
+      : null;
+    if (!target || (pathParam?!routeMatch:target.pathname!==path) || target.search || target.hash)
       return res.status(400).json({error:'INVALID_ROUTE'});
     if (req.method!=='POST') {
       res.setHeader('Allow','POST');
@@ -62,19 +65,21 @@ export function createNoteRestoreHandler({ preview=false, verifyLogin, callRpc,
       return res.status(415).json({error:'JSON_REQUIRED'});
     let input;
     try { input=typeof req.body==='string' && req.body.length<=2048 ? JSON.parse(req.body) : req.body; } catch {}
-    const keys=preview?['id']:['id','backupId','contentSha256','currentSha256'];
-    if (!exact(input,keys) || typeof input.id!=='string' || !UUID.test(input.id)
+    const keys=pathParam?['backupId','contentSha256','currentSha256']
+      :preview?['id']:['id','backupId','contentSha256','currentSha256'];
+    const noteId=pathParam?routeMatch?.[1]:input?.id;
+    if (!exact(input,keys) || typeof noteId!=='string' || !UUID.test(noteId)
       || (!preview && (typeof input.backupId!=='string' || !UUID.test(input.backupId)
         || typeof input.contentSha256!=='string' || !HASH.test(input.contentSha256)
         || typeof input.currentSha256!=='string'
         || (input.currentSha256!=='missing' && !HASH.test(input.currentSha256)))))
       return res.status(400).json({error:'INVALID_RESTORE_REQUEST'});
-    const payload={p_actor:identity.userId,p_note_id:input.id};
+    const payload={p_actor:identity.userId,p_note_id:noteId};
     if (!preview) Object.assign(payload,{p_backup_id:input.backupId,p_content_hash:input.contentSha256,
       p_expected_current:input.currentSha256});
     try {
       const data=await rpc(preview?'learning_preview_note_restore':'learning_restore_note',payload);
-      if (!plain(data) || data.id!==input.id || !HASH.test(data.contentSha256 ?? '')) throw new Error('RESTORE_UNAVAILABLE');
+      if (!plain(data) || data.id!==noteId || !HASH.test(data.contentSha256 ?? '')) throw new Error('RESTORE_UNAVAILABLE');
       res.setHeader('X-Resource-Decision','allow');
       res.setHeader('X-Resource-Reason',preview?'restore_preview_verified':'restore_verified');
       if (preview) {

@@ -1,11 +1,16 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runRestorePreview } from '../src/restore-workflow.mjs';
+import { previewSafePolicy } from './policy-snapshot.mjs';
 export { runRestorePreview };
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const args = process.argv.slice(2);
+    if (args.length === 0) {
+      process.stdout.write(JSON.stringify(previewSafePolicy(), null, 2) + '\n');
+      process.exit(0);
+    }
     const names = new Map([['--backup', 'backupPath'], ['--verified-sha256', 'verifiedSha256'], ['--trial-dir', 'trialDir']]);
     const options = {};
     if (args.length !== 6) throw new Error('preview_arguments_invalid');

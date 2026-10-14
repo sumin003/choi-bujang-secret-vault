@@ -88,10 +88,26 @@ test('서버 RPC는 서버 키만 사용하고 오류 상세·사본 원문을 �
   await assert.rejects(rpc('learning_restore_note',{}),/^Error: RESTORE_UNAVAILABLE$/);
 });
 
-test('실제 복원 라우트는 설정의 서비스·POST 경로와 일치한다',async()=>{
+test('복원 라우트는 설정된 POST 경로 문자열과 일치한다',async()=>{
   const {default:config}=await import('../aleph.config.json',{with:{type:'json'}});
-  assert.deepEqual(config.restoreRoute,{service:'notes',method:'POST',path:'/api/restore-notes'});
+  assert.equal(config.restoreRoute,'/api/restore/notes/:id');
+  assert.ok(config.allowedRoutes.includes('POST /api/restore/notes/:id'));
   assert.ok(config.allowedRoutes.includes('POST /api/restore-notes'));
   assert.ok(config.allowedRoutes.includes('POST /api/restore-notes/preview'));
   assert.ok(config.step>=10);
+});
+
+test('설정된 경로의 ID로 B 본인 메모 한 건만 복원한다',async()=>{
+  const handler=create({pathParam:true,callRpc:async(name,payload)=>{
+    assert.equal(name,'learning_restore_note');
+    assert.deepEqual(payload,{p_actor:B,p_note_id:ID,p_backup_id:BACKUP,p_content_hash:HASH,p_expected_current:CURRENT});
+    return {id:ID,restored:true,contentSha256:HASH};
+  }});
+  const res=response();
+  await handler(request({backupId:BACKUP,contentSha256:HASH,currentSha256:CURRENT},`/api/restore/notes/${ID}`),res);
+  assert.equal(res.statusCode,200);
+  assert.deepEqual(res.body,{id:ID,restored:true,contentSha256:HASH});
+  const extra=response();
+  await handler(request({...body,id:ID},`/api/restore/notes/${ID}`),extra);
+  assert.equal(extra.statusCode,400);
 });

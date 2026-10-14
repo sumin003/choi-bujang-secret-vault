@@ -12,6 +12,12 @@ const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const exactKeys = (value, keys) => plain(value) && Object.keys(value).length === keys.length
   && keys.every(key => Object.hasOwn(value, key));
+const utcMillis = value => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value))
+    return Number.NaN;
+  const millis = Date.parse(value);
+  return Number.isFinite(millis) && new Date(millis).toISOString() === value ? millis : Number.NaN;
+};
 
 function policyLines(bytes) {
   if (!Buffer.isBuffer(bytes) || bytes.length > MAX_POLICY_BYTES) fail('policy_input_invalid');
@@ -34,10 +40,14 @@ export function readVerifiedBackup(backupBytes, verifiedSha256) {
   let backup;
   try { backup = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(backupBytes)); }
   catch { fail('backup_input_invalid'); }
-  if (!exactKeys(backup, ['schema', 'version', 'files'])
+  if (!exactKeys(backup, ['schema', 'version', 'verifiedAt', 'incidentAt', 'files'])
     || backup.schema !== 'aleph.policy.backup.v1' || typeof backup.version !== 'string'
     || !/^[a-f0-9]{40}$/i.test(backup.version) || !Array.isArray(backup.files)
     || backup.files.length < 1 || backup.files.length > POLICY_PATHS.length) fail('backup_input_invalid');
+  const verifiedAt = utcMillis(backup.verifiedAt);
+  const incidentAt = utcMillis(backup.incidentAt);
+  if (!Number.isFinite(verifiedAt) || !Number.isFinite(incidentAt) || verifiedAt >= incidentAt)
+    fail('backup_verification_failed');
   const seen = new Set();
   for (const file of backup.files) {
     if (!exactKeys(file, ['path', 'content']) || !POLICY_PATHS.includes(file.path)
@@ -94,6 +104,7 @@ export function createRestorePreview({ backupBytes, verifiedSha256, trialFiles }
       afterSha256: sha256(desiredBytes), ranges });
   }
   return { schema: 'aleph.restore.preview.v1', mode: 'preview_only',
-    restoreVersion: backup.version.toLowerCase(),
+    restoreVersion: backup.version.toLowerCase(), verifiedAt: backup.verifiedAt,
+    incidentAt: backup.incidentAt,
     verifiedBackupSha256: verifiedSha256.toLowerCase(), changes };
 }

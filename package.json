@@ -15,10 +15,11 @@
     "test:stage8": "node --test test/stage8-decider.test.mjs test/resource-zones.test.mjs",
     "test:stage9": "node --test test/detect-input.test.mjs test/detect-rule.test.mjs test/decider-contract.test.mjs",
     "restore:preview": "node scripts/restore-preview.mjs",
+    "restore:snapshot": "node scripts/create-policy-snapshot.mjs",
     "test:restore-preview": "node --test test/restore-preview.test.mjs",
     "restore:apply": "node scripts/restore-trial.mjs",
     "test:restore": "node --test test/restore-preview.test.mjs test/restore-trial.test.mjs",
-    "test:stage10": "node --test test/restore-preview.test.mjs test/restore-trial.test.mjs test/note-restore.test.mjs test/restore-access-regression.test.mjs"
+    "test:stage10": "node --test test/restore-preview.test.mjs test/restore-trial.test.mjs test/note-restore.test.mjs test/restore-access-regression.test.mjs test/policy-snapshot.test.mjs"
   },
   "engines": {
     "node": ">=22"

@@ -1,0 +1,16 @@
+{
+  "schema": "aleph.policy.snapshot.v1",
+  "commit": "78b2ae8f6d478db8f331da5d001acb2844a28b0c",
+  "files": {
+    "src/decider.mjs": "f78d4368ce339b0a7f133f9aa52e9d3985e6c2e0d6ae50d950c769a43db18836",
+    "aleph.config.json": "ec9663c978fb2b02b11d059023a1c660ee56409c75ee483c819d36d1c30ee5f8",
+    "src/detect.mjs": "1969913900d1b4a56d9d697d504bbf63d695eeba6cb0e439687a2fea0270a554",
+    "xdr/brute-force/decide.mjs": "af12cee1d02480c69f077a64be5df457b539c8500c4943ec9f8a46b2e7d7d7f5",
+    "xdr/brute-force/patterns.json": "c963085337a92103f98b9648d8675925c97ef376c6af4930034eca8ef53c9de7",
+    "xdr/brute-force/deny-rules.json": "e1095bab5e6ca59b7c8d3fa2b164bfe7f831c9eb6c81a66bff22811276e35d99",
+    "xdr/web-injection/decide.mjs": "a4483130ab65d2b0be8406e15629e1f93de0d32af5ba758179528c8fb6a9bcc5",
+    "xdr/web-injection/patterns.json": "0fdb6382e5f7cfe8bf61255d1b51e306021369ba22d7a2f8e7f96b0621e9a7d4",
+    "xdr/web-injection/deny-rules.json": "e1095bab5e6ca59b7c8d3fa2b164bfe7f831c9eb6c81a66bff22811276e35d99"
+  },
+  "sha256": "08ab1b821d80aaf665464353be1537dc7728175dc03f6e8edbae3afc762ff345"
+}

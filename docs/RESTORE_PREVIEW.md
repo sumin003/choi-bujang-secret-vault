@@ -1,10 +1,26 @@
 # 복원 전 확인
 
-검증한 안전 사본과 격리된 시험 정책을 지정하면 복원 예정 버전과 변경 범위를 JSON으로 표시합니다. 미리보기는 파일을 쓰지 않습니다. 확인 후 선택한 항목을 시험 폴더에 복원하는 별도 CLI 절차를 제공합니다. 정책 복원은 운영 API를 호출하지 않습니다. 별도로 추가한 메모 복원 POST /api/restore-notes는 README의 notes 서비스 경로를 따르며, restoreRoute도 이 메모 경로만 가리킵니다.
+## 저장소에 고정한 정책 기준 사본 확인
+
+기본 확인 명령은 별도 인자 없이 실행합니다.
+
+```sh
+npm run restore:preview
+```
+
+명령은 `restore/safe-policy.json`을 매 실행마다 다시 읽습니다. 이 파일에는 정책 원문이 아니라 정책 파일별 SHA-256만 있습니다. 검증기는 사본 스키마와 자체 해시를 확인하고, 기준 커밋 `78b2ae8f6d478db8f331da5d001acb2844a28b0c`이 존재하며 현재 커밋의 조상인지 확인한 다음, 해당 커밋에서 정책 파일을 다시 읽어 해시를 재계산해 사본과 비교합니다. 하나라도 없거나 일치하지 않으면 오류로 끝나며 변경 계획을 출력하지 않습니다.
+
+성공하면 `mode: preview_only`, `restoreVersion`, `restoreCommitDate`, 검증 결과, 현재와 기준 사본의 해시가 다른 경로만 표시합니다. 이 명령은 읽기만 하며 어떤 정책 파일도 복원하거나 수정하지 않습니다. 기준은 사용자가 정한 9단계 저장점이며, 독립 보관된 침해 전 백업이나 운영 정책의 안전성을 새로 증명하는 자료라고 주장하지 않습니다.
+
+`restore:snapshot`은 기준 커밋에서 이 해시 전용 사본을 만들 때 사용하는 초기화 명령입니다. 이미 존재하는 사본을 덮어쓰지 않습니다. 일상 확인에서는 사본을 재생성하지 말고 `restore:preview`로 기존 사본을 재검증합니다.
+
+기존 임시 백업 JSON을 지정하는 미리보기/격리 복원 절차는 아래와 같이 별도 유지됩니다.
+
+검증한 안전 사본과 격리된 시험 정책을 지정하면 복원 예정 버전과 변경 범위를 JSON으로 표시합니다. 미리보기는 파일을 쓰지 않습니다. 확인 후 선택한 항목을 시험 폴더에 복원하는 별도 CLI 절차를 제공합니다. 정책 복원은 운영 API를 호출하지 않습니다. 메모 복원 경로는 `POST /api/restore/notes/:id`이며 `restoreRoute`가 가리키고, 이전 `/api/restore-notes` 경로도 호환을 위해 유지합니다.
 
 안전 사본은 침해 전 안전성을 확인할 때 별도로 보관한 백업 JSON과, 독립된 신뢰 위치에 보관한 SHA-256의 조합입니다. 이 기능은 사본의 무결성과 형식을 검증합니다. 해시 일치만으로 내용의 안전성·검증 시각·커밋과의 대응을 새로 증명하지 않습니다. 비교 직전에 사본에서 해시를 다시 만들어 검증을 대신하면 안 됩니다. 안전 사본이 없다고 이 저장소의 정책을 자동으로 안전하다고 지정하지 않습니다.
 
-백업 형식은 schema가 aleph.policy.backup.v1, version이 검증한 커밋의 40자리 SHA, files가 path/content 배열입니다. 파일 목록·내용·version을 포함한 JSON 전체가 사전 검증 및 해시 보관 대상입니다. 사본에는 정책 원문이 들어가므로 Git·public·로그에는 저장하지 않습니다.
+백업 형식은 schema가 `aleph.policy.backup.v1`, version이 검증한 커밋의 40자리 SHA, `verifiedAt`과 `incidentAt`이 UTC ISO 시각, files가 path/content 배열입니다. `verifiedAt`은 `incidentAt`보다 앞서야 합니다. 파일 목록·내용·version·검증 시각·사건 시각을 포함한 JSON 전체가 사전 검증 및 해시 보관 대상입니다. 사본에는 정책 원문이 들어가므로 Git·public·로그에는 저장하지 않습니다.
 
 대상 경로는 src/decider.mjs, src/detect.mjs, src/xdr-gate.mjs, xdr/brute-force/deny-rules.json, xdr/web-injection/deny-rules.json입니다. 백업에 포함된 정책만 비교하며 포함되지 않은 파일은 삭제 대상으로 삼지 않습니다. 알 수 없는 경로·중복 경로·빈 백업은 거부합니다. 메모·DB 자료·환경변수·키 파일은 대상에 넣지 않습니다.
 
@@ -12,7 +28,7 @@
 npm run restore:preview -- --backup "안전사본JSON파일" --verified-sha256 "검증당시보관한64자리SHA256" --trial-dir "격리된시험정책폴더"
 ```
 
-성공하면 mode: preview_only, restoreVersion, changes를 표시합니다. changes의 path는 변경 예정 파일, operation은 replace/create, beforeSha256/afterSha256은 시험 정책/복원 사본 식별용 해시입니다. ranges의 trial/backup에는 삭제/추가 구간의 1부터 시작하는 startLine과 lineCount를 넣습니다. 차이 없는 파일·일치하는 줄·정책 원문·개인정보는 표시하지 않습니다. 시험 파일이 없으면 create 예정으로 표시하며 실제로 만들지 않습니다. 시험 폴더 자체가 없으면 중단합니다.
+성공하면 `mode: preview_only`, `restoreVersion`, `verifiedAt`, `incidentAt`, `changes`를 표시합니다. changes의 path는 변경 예정 파일, operation은 replace/create, beforeSha256/afterSha256은 시험 정책/복원 사본 식별용 해시입니다. ranges의 trial/backup에는 삭제/추가 구간의 1부터 시작하는 startLine과 lineCount를 넣습니다. 차이 없는 파일·일치하는 줄·정책 원문·개인정보는 표시하지 않습니다. 시험 파일이 없으면 create 예정으로 표시하며 실제로 만들지 않습니다. 시험 폴더 자체가 없으면 중단합니다.
 
 ## 확인 후 시험 정책 복원
 

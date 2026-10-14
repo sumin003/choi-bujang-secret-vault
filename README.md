@@ -4,7 +4,7 @@
 
 ## 10단계 작업 기록
 
-정책 복원은 [RESTORE_PREVIEW.md](docs/RESTORE_PREVIEW.md)의 격리된 시험 폴더에서만 수행합니다. 검증한 안전 사본이 없으면 중단하며 복원 버전·변경 구간을 확인한 뒤 선택한 항목만 복원합니다. 다른 서비스의 구간과 기존 감사 이력은 보존합니다. 정책 원문·키는 미리보기나 감사 기록에 넣지 않습니다.
+정책 복원은 [RESTORE_PREVIEW.md](docs/RESTORE_PREVIEW.md)의 격리된 시험 폴더에서만 수행합니다. 저장소에는 9단계 기준 커밋에 고정한 정책 파일 해시 사본만 둡니다. `npm run restore:preview`는 매번 사본의 자체 해시, 기준 커밋의 존재·현재 커밋 조상 여부, 기준 커밋에서 다시 읽은 정책 파일 해시를 확인한 뒤 복원 버전과 변경 경로를 표시합니다. 검증에 실패하거나 사본이 없으면 중단합니다. 이 미리보기는 읽기 전용이며 운영 정책을 쓰지 않습니다. 정책 원문·키는 사본·미리보기·감사 기록에 넣지 않습니다.
 
 ### 비공개 가상 메모 한 건 복원
 
@@ -12,8 +12,9 @@
 |---|---|---|
 | notes | POST /api/restore-notes/preview | 본인 사본의 ID·해시와 예정 변경 한 건 확인 |
 | notes | POST /api/restore-notes | 확인한 사본으로 지정한 메모 한 건 복원 |
+| notes | POST /api/restore/notes/:id | 설정에 등록된 호환 복원 경로; ID는 경로에서 받고 본문에 ID를 중복 전달하지 않음 |
 
-aleph.config.json의 step은 10이며 allowedRoutes에 두 경로를 기록했습니다. restoreRoute는 service: notes, method: POST, path: /api/restore-notes입니다. 기존 주소·로그인 발급자·judgeIssuer·원본 API와 이전 허용 경로를 유지합니다. 화면 메뉴와 기존 메모 CRUD는 변경하지 않습니다.
+aleph.config.json의 step은 10이며 allowedRoutes에 세 경로를 기록했습니다. restoreRoute는 심판 경로 형식인 "/api/restore/notes/:id"입니다. 기존 주소·로그인 발급자·judgeIssuer·원본 API와 이전 허용 경로를 유지합니다. 화면 메뉴와 기존 메모 CRUD는 변경하지 않습니다.
 
 로그인은 기존 src/verify-login.mjs로 검증합니다. 서버가 확인한 사용자 UUID와 비공개 사본·남아 있는 메모의 owner_id를 대조합니다. UUID와 원래 숫자 ID를 대조하고, UUID·소유자·제목·본문으로 계산한 SHA-256도 확인합니다. 사전 확인 뒤 시험 메모가 바뀌면 거부합니다. 본문 owner_id·userId·role·새 메모 내용은 받지 않습니다. 소유자 변경이나 여러 메모 복원도 허용하지 않습니다.
 
@@ -23,7 +24,7 @@ aleph.config.json의 step은 10이며 allowedRoutes에 두 경로를 기록했�
 
 1. B로 로그인한 뒤 비공개 검증 사본이 있는 본인 메모의 UUID를 선택합니다. Authorization 값은 공유하거나 기록하지 않습니다.
 2. POST /api/restore-notes/preview에 JSON {"id":"선택한 메모 UUID"}를 보냅니다. 응답의 id·backupId·contentSha256·currentSha256·operation을 확인합니다. 원문은 응답하지 않습니다.
-3. 확인한 id·backupId·contentSha256·currentSha256 네 항목만 POST /api/restore-notes에 보냅니다. 정상 결과는 200과 restored: true입니다. 이후 기존 본인 메모 GET 경로로 내용을 확인합니다.
+3. 확인한 backupId·contentSha256·currentSha256 세 항목을 POST /api/restore/notes/{id}에 보냅니다. 메모 ID는 URL의 `{id}`에 넣고 본문에 중복 전송하지 않습니다. 정상 결과는 200과 restored: true입니다. 이후 기존 본인 메모 GET 경로로 내용을 확인합니다.
 
 검증 사본이 없으면 RESTORE_SOURCE_NOT_FOUND와 404로 중단합니다. 미검증 사본·내용 해시 불일치·사전 확인 뒤 변경은 409로 거부합니다. 로그인이 없거나 검증에 실패하면 JSON 401이며 복원 DB 함수를 호출하지 않습니다. 사본을 자동 생성하거나 미검증 사본을 임의로 검증 완료로 지정하는 API는 없습니다.
 

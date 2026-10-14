@@ -11,7 +11,8 @@ import { runRestorePreview } from '../scripts/restore-preview.mjs';
 
 const version = '1234567890abcdef1234567890abcdef12345678';
 const sha = value => createHash('sha256').update(value).digest('hex');
-const snapshot = files => Buffer.from(JSON.stringify({ schema: 'aleph.policy.backup.v1', version, files }));
+const snapshot = files => Buffer.from(JSON.stringify({ schema: 'aleph.policy.backup.v1', version,
+  verifiedAt: '2026-10-01T00:00:00.000Z', incidentAt: '2026-10-13T00:00:00.000Z', files }));
 const preview = (backupBytes, trialFiles) => createRestorePreview({ backupBytes, trialFiles, verifiedSha256: sha(backupBytes) });
 
 test('복원 버전과 파일별 변경 줄 범위를 실행 없이 표시한다', () => {
@@ -19,6 +20,8 @@ test('복원 버전과 파일별 변경 줄 범위를 실행 없이 표시한다
   const trial = Buffer.from('same\nallow unknown\nshared\nowner optional\nend\n');
   const result = preview(backup, { 'src/decider.mjs': trial });
   assert.equal(result.restoreVersion, version);
+  assert.equal(result.verifiedAt, '2026-10-01T00:00:00.000Z');
+  assert.equal(result.incidentAt, '2026-10-13T00:00:00.000Z');
   assert.equal(result.mode, 'preview_only');
   assert.equal(result.changes.length, 1);
   assert.equal(result.changes[0].path, 'src/decider.mjs');
@@ -80,6 +83,19 @@ test('검증된 사본도 복원 버전이 없거나 변조되면 중단한다',
   changed[0] = '['.charCodeAt(0);
   assert.throws(() => createRestorePreview({ backupBytes: changed, verifiedSha256: sha(backup), trialFiles: {} }),
     /backup_verification_failed/);
+});
+
+test('사건 시각이 검증 시각보다 빠르거나 같으면 안전 사본으로 인정하지 않는다', () => {
+  for (const [verifiedAt, incidentAt] of [
+    ['2026-10-14T00:00:00.000Z', '2026-10-13T00:00:00.000Z'],
+    ['2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z'],
+    ['invalid', '2026-10-14T00:00:00.000Z'],
+  ]) {
+    const backup = Buffer.from(JSON.stringify({ schema: 'aleph.policy.backup.v1', version,
+      verifiedAt, incidentAt, files: [{ path: 'src/decider.mjs', content: 'deny\\n' }] }));
+    assert.throws(() => createRestorePreview({ backupBytes: backup, verifiedSha256: sha(backup),
+      trialFiles: { 'src/decider.mjs': Buffer.from('allow\\n') } }), /backup_verification_failed/);
+  }
 });
 
 test('CLI는 누락·검증 실패를 먼저 중단하고 성공 시 버전·범위만 출력하며 파일을 보존한다', async () => {
