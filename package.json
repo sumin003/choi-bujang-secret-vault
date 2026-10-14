@@ -11,7 +11,8 @@
     "detect:test": "node scripts/detect-test.mjs",
     "fixture:7": "node scripts/fixture-7.mjs",
     "xdr:run": "node scripts/xdr-run.mjs",
-    "test:stage8": "node --test test/stage8-decider.test.mjs test/resource-zones.test.mjs"
+    "test:stage8": "node --test test/stage8-decider.test.mjs test/resource-zones.test.mjs",
+    "test:stage9": "node --test test/detect-input.test.mjs test/detect-rule.test.mjs test/decider-contract.test.mjs"
   },
   "engines": {
     "node": ">=22"

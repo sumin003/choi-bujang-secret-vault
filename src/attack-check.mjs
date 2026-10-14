@@ -1,10 +1,12 @@
 import { fixtureRequests } from '../scripts/fixture-7.mjs';
 import { decide } from './decider.mjs';
+import { detect } from './detect.mjs';
+import { checkDetection } from '../scripts/detect-test.mjs';
 
 // Record only what was actually requested/returned, never keys, tokens or response bodies.
 export async function runAttackChecks(config) {
   if (config.step === 1) return legacyStageOne(config);
-  if (![6, 7, 8].includes(config.step)) throw new Error('이 단계의 자기 점검을 구현해 주세요.');
+  if (![6, 7, 8, 9].includes(config.step)) throw new Error('이 단계의 자기 점검을 구현해 주세요.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.search || app.hash || app.pathname !== '/')
     throw new Error('자료실의 HTTPS 배포 주소를 확인해 주세요.');
@@ -22,7 +24,7 @@ export async function runAttackChecks(config) {
       attempts.push({ attackId, expected, observed: '로컬 가상 판정: ' + output.decision + ' · ' + output.reasonCode + ' (실제 재로그인·자료 차단 실측 아님)' });
     }
   }
-  if (config.step === 8) {
+  if (config.step >= 8) {
     for (const [attackId, input, expected] of [
       ['note_collection_local', {...normal,path:'/notes',route:'GET /notes'}, '가상 메모 전체 목록 경로는 deny'],
       ['notice_write_local', {...normal,subjectId:'teacher_fixture',service:'instructor_announcements',method:'PUT',
@@ -35,6 +37,13 @@ export async function runAttackChecks(config) {
       const output = await evaluate(input);
       attempts.push({attackId,expected,observed:'로컬 가상 판정: '+output.decision+' · '+output.reasonCode+' (실배포 API·운영 권한 등록 검증 아님)'});
     }
+  }
+  if (config.step === 9) {
+    const checks = await checkDetection(detect);
+    const passed = checks.filter(item => item.passed).length;
+    attempts.push({attackId:'detection_proposal_local',
+      expected:'가상 복합 의심의 확인 기기 한 개만 회수 제안; 정상 observe; 확인 정보 부족은 alert',
+      observed:'로컬 탐지 연습 '+passed+'/'+checks.length+' 통과 (실제 회수·경과 시간·심판 판정 아님)'});
   }
   try {
     const response = await fetch(new URL('/api/notes', app), { redirect: 'error',

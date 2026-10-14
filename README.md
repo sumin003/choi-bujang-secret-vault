@@ -2,6 +2,16 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
+## 9단계 저장점
+
+GitHub의 eea9d9cb38c4(8단계 저장점)을 기준으로 탐지 입력과 복합 의심 규칙을 추가했습니다. 입력은 가명 사용자·기기·요청 종류·판정과 시각·필요한 가상 신호만 선별합니다. 비정상 가상 네트워크에서 10분 내 GET 120건 초과가 나타난 확인 기기 한 개에만 별도 propose_revocation·burst_read·deviceId 결과를 반환합니다. 정상은 observe, 확인 기기를 특정할 수 없는 복합 의심은 alert입니다. 실제 회수 API·권한 변경·경과 시간 측정은 구현하지 않았습니다. 확장 사건 형식의 심판 호환성과 실제 회수·시간 확인은 심판 검증 대상입니다. 자세한 형식은 [DETECT_EVENTS.md](docs/DETECT_EVENTS.md)를 따릅니다.
+
+aleph.config.json의 step을 9로 올리고 기존 배포 주소·발급자·허용 경로·originalApiUrl·judgeIssuer는 유지했습니다. src/decider.mjs의 기존 18항목 요청·5항목 응답과 RULE_IDS는 변경하지 않았습니다. 계약 밖 role·identity·device 등의 값을 읽지 않는 검사와 JSON 직렬화 후 응답 형식·규칙 ID 검사를 추가했습니다. 단계 9에서 제출 자기 점검이 실행되도록 src/attack-check.mjs도 맞췄습니다.
+
+2026-10-14 Node v24.19.0에서 npm run test:stage9의 23건, test:stage8의 20건, detect:test의 14항목, decider:test와 로컬 빌드가 통과했습니다. 패키지와 잠금 파일의 의존성 버전은 그대로 유지했습니다.
+
+다시 실행: Node 22 이상에서 npm install → npm run test:stage9 → npm run decider:test → npm run detect:test → npm run build -- --local. 탐지 연습 출력에서 정상 observe 유지와 확인 기기 대상·이유 코드가 있는 회수 제안을 확인합니다. 브라우저 로그인·본인 메모 화면과 기존 자료는 보존합니다. 아래는 이전 단계 기록입니다.
+
 ## 8단계 저장점
 
 ### 전체 목록·공지 쓰기 구역 거부 보완
