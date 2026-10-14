@@ -2,6 +2,50 @@
 
 이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
 
+## 10단계 작업 기록
+
+정책 복원은 [RESTORE_PREVIEW.md](docs/RESTORE_PREVIEW.md)의 격리된 시험 폴더에서만 수행합니다. 검증한 안전 사본이 없으면 중단하며 복원 버전·변경 구간을 확인한 뒤 선택한 항목만 복원합니다. 다른 서비스의 구간과 기존 감사 이력은 보존합니다. 정책 원문·키는 미리보기나 감사 기록에 넣지 않습니다.
+
+### 비공개 가상 메모 한 건 복원
+
+| 서비스 | 메서드·정확한 경로 | 동작 |
+|---|---|---|
+| notes | POST /api/restore-notes/preview | 본인 사본의 ID·해시와 예정 변경 한 건 확인 |
+| notes | POST /api/restore-notes | 확인한 사본으로 지정한 메모 한 건 복원 |
+
+aleph.config.json의 step은 10이며 allowedRoutes에 두 경로를 기록했습니다. restoreRoute는 service: notes, method: POST, path: /api/restore-notes입니다. 기존 주소·로그인 발급자·judgeIssuer·원본 API와 이전 허용 경로를 유지합니다. 화면 메뉴와 기존 메모 CRUD는 변경하지 않습니다.
+
+로그인은 기존 src/verify-login.mjs로 검증합니다. 서버가 확인한 사용자 UUID와 비공개 사본·남아 있는 메모의 owner_id를 대조합니다. UUID와 원래 숫자 ID를 대조하고, UUID·소유자·제목·본문으로 계산한 SHA-256도 확인합니다. 사전 확인 뒤 시험 메모가 바뀌면 거부합니다. 본문 owner_id·userId·role·새 메모 내용은 받지 않습니다. 소유자 변경이나 여러 메모 복원도 허용하지 않습니다.
+
+사본은 learning_backup.note_copies에 두고 public 폴더·Git·브라우저 파일에는 보관하지 않습니다. RLS와 권한 회수로 PUBLIC·anon·authenticated의 직접 접근을 막았습니다. 서버 역할은 사본 SELECT만 가능하며, 복원 RPC는 서비스 역할만 실행합니다. 복원과 learning_backup.note_restore_audit의 감사 기록 추가는 같은 트랜잭션입니다. 감사 기록을 쓸 수 없으면 메모 변경도 롤백합니다. 다른 메모와 이전 감사 행은 수정·삭제하지 않습니다. 새 감사 기록에도 원문·토큰·키는 넣지 않습니다. 스키마는 [note-restore.sql](docs/note-restore.sql)에 기록했습니다.
+
+확인 순서:
+
+1. B로 로그인한 뒤 비공개 검증 사본이 있는 본인 메모의 UUID를 선택합니다. Authorization 값은 공유하거나 기록하지 않습니다.
+2. POST /api/restore-notes/preview에 JSON {"id":"선택한 메모 UUID"}를 보냅니다. 응답의 id·backupId·contentSha256·currentSha256·operation을 확인합니다. 원문은 응답하지 않습니다.
+3. 확인한 id·backupId·contentSha256·currentSha256 네 항목만 POST /api/restore-notes에 보냅니다. 정상 결과는 200과 restored: true입니다. 이후 기존 본인 메모 GET 경로로 내용을 확인합니다.
+
+검증 사본이 없으면 RESTORE_SOURCE_NOT_FOUND와 404로 중단합니다. 미검증 사본·내용 해시 불일치·사전 확인 뒤 변경은 409로 거부합니다. 로그인이 없거나 검증에 실패하면 JSON 401이며 복원 DB 함수를 호출하지 않습니다. 사본을 자동 생성하거나 미검증 사본을 임의로 검증 완료로 지정하는 API는 없습니다.
+
+### 복구 뒤 1~9단계 회귀 확인 순서
+
+아래 순서는 복구 기능을 추가한 뒤 이전 단계의 허용·거부 동작을 다시 확인할 때 사용합니다. 로컬 자동 시험과 배포에서 직접 보낸 요청을 구분해 기록합니다. 테스트 계정·토큰·메모 본문은 로그나 공유 메시지에 남기지 않습니다.
+
+1. 저장소 루트에서 `npm install` 후 `npm run build -- --local`을 실행합니다. 빌드가 끝나면 생성된 배포 파일에서 `/aleph.json`이 있고 `/data.json` 및 가상 메모 문장이 없는지 확인합니다. 첫 화면 응답의 `X-Content-Type-Options: nosniff`도 확인합니다.
+2. `npm run test:r5`를 실행한 다음 로그인·메모 API를 확인합니다. 로그인 없이 `GET /api/notes`를 보내 JSON 401/403이 오는지 확인하고, 로그인한 A와 B가 각각 자기 목록·단건 조회·추가·수정·삭제를 할 수 있는지 확인합니다. 반대 계정의 UUID로 단건 GET·PUT·DELETE를 보내면 자료가 나오지 않고 404여야 합니다. 요청 본문의 `owner_id`·`userId`·`role`을 바꿔도 소유권이 바뀌지 않아야 합니다.
+3. `npm run decider:test`를 실행합니다. 등록 기기의 정상 요청은 허용되고 미등록 또는 등록 상태 누락 요청은 `deny`·`device_not_registered`여야 합니다.
+4. 7단계 가상 사건을 `npm run fixture:7`로 실행합니다. 정상 사건은 `allow`, 정해 둔 복합 이상 사건은 `step_up`이어야 합니다. 실제 재로그인 계약이 확인되지 않았으므로 새 로그인 뒤 허용 여부는 미실행으로 둡니다.
+5. `npm run test:stage8`을 실행합니다. 자기 메모의 허용 경로와 지정한 단건 자료 동작은 유지되고, 전체 목록을 판정기에서 여는 요청, 다른 소유자의 자료, 학생의 공지 수정, 알 수 없는 경로는 거부되어야 합니다.
+6. `npm run test:stage9`와 `npm run detect:test`를 실행합니다. 정상 가상 사건과 복합 의심 사건이 구분되고, 복합 의심에만 대상 기기와 이유 코드가 있는 `propose_revocation`이 나오는지 확인합니다. 정상 사건에는 제안이 없어야 합니다. 실제 기기 권한 회수는 미실행으로 둡니다.
+7. 복구 기능의 로컬 회귀 시험으로 `npm run test:stage10`을 실행합니다. B의 가상 메모 한 건을 복원한 뒤 A의 자기 메모 조회는 허용, B의 A 메모 조회는 `resource_zone`·404로 거부, B의 복원 메모 조회는 허용되는지 확인합니다. 정책 시험도 복원 직후 A의 GET·PUT·DELETE 허용과 B의 같은 요청 거부를 확인합니다. ID·소유자·내용 해시 불일치·미검증 사본은 거부되어야 합니다. 이 통합 시험은 합성 사본을 사용하므로 실제 백업에서 복원한 증거로 기록하지 않습니다.
+8. 위 명령을 통과한 뒤 배포된 커밋에서 로그인·메모 API의 정상·금지 요청을 다시 확인합니다. 로컬 시험 통과와 배포 실측을 구분해 기록합니다.
+
+2026-10-14 로컬 회귀 확인: `npm run test:r5` 2건, `npm run decider:test`, `npm run fixture:7`, `npm run test:stage8` 20건, `npm run test:stage9` 26건, `npm run detect:test` 6항목, `npm run detect:device-test` 14항목, `npm run test:stage10` 28건 및 `npm run build -- --local`이 통과했습니다. stage10 통합 시험은 메모 복원 뒤 A 자기 조회 허용, B의 A 메모 조회 404 거부, B의 복원 메모 조회 허용과 정책 복원 뒤 B의 A 메모 요청 거부를 확인합니다. 배포에서 실제 A/B로 보낸 요청, 실제 침해 전 검증 사본에서의 복원 및 실제 안전 정책을 운영 환경에 적용하는 시험은 미실행입니다.
+
+2026-10-14 학습 DB에서 실제 시험 계정 B 소유의 임시 가상 메모 한 건으로 수정 복원·삭제 후 재생성·소유자 거부·해시 불일치·미검증 사본·사전 확인 뒤 변경·감사 실패 시 메모 롤백을 확인했습니다. 서버 역할로 RPC를 실행했고 다른 메모와 이전 감사 이력의 불변을 비교했습니다. [B용 롤백 시험](docs/note-restore-test-b.sql)의 결과 12항목은 모두 true였으며 시험 메모·사본·추가 감사 행·임시 권한 변경은 전부 롤백했습니다. 기존 메모 7건을 유지합니다.
+
+로컬 npm run test:stage10 28건, 기존 test:stage8 20건·test:stage9 26건과 build -- --local이 통과했습니다. 이 결과는 로컬 시험과 DB 통합 시험이며, 배포 주소에서 실제 B 로그인으로 POST한 증거는 아닙니다. 시험 후 보관된 검증 사본은 0건입니다. 운영용 복원은 신뢰할 수 있는 검증 사본을 따로 준비한 경우에만 가능합니다. 침해 전 안전 정책 사본의 존재나 실제 운영 정책 복원 완료도 주장하지 않습니다. 다시 실행: npm run test:stage10. 아래는 이전 저장점 기록입니다.
+
 ## 9단계 저장점
 
 ### 제공된 탐지 계약 호환성 복구

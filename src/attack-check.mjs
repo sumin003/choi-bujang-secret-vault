@@ -3,11 +3,13 @@ import { decide } from './decider.mjs';
 import { detect } from './detect.mjs';
 import { checkDetection } from '../scripts/detect-test.mjs';
 import { checkDetection as checkDeviceDetection } from '../scripts/detect-device-test.mjs';
+import { runRestoreAccessChecks } from '../scripts/restore-access-check.mjs';
 
 // Record only what was actually requested/returned, never keys, tokens or response bodies.
 export async function runAttackChecks(config) {
   if (config.step === 1) return legacyStageOne(config);
-  if (![6, 7, 8, 9].includes(config.step)) throw new Error('이 단계의 자기 점검을 구현해 주세요.');
+  if (!Number.isInteger(config.step) || config.step < 6 || config.step > 10)
+    throw new Error('이 단계의 자기 점검을 구현해 주세요.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.search || app.hash || app.pathname !== '/')
     throw new Error('자료실의 HTTPS 배포 주소를 확인해 주세요.');
@@ -39,7 +41,7 @@ export async function runAttackChecks(config) {
       attempts.push({attackId,expected,observed:'로컬 가상 판정: '+output.decision+' · '+output.reasonCode+' (실배포 API·운영 권한 등록 검증 아님)'});
     }
   }
-  if (config.step === 9) {
+  if (config.step >= 9) {
     const checks = await checkDetection(detect);
     const passed = checks.filter(item => item.passed).length;
     const deviceChecks = await checkDeviceDetection(detect);
@@ -47,6 +49,19 @@ export async function runAttackChecks(config) {
     attempts.push({attackId:'detection_proposal_local',
       expected:'제공 원본 계약의 대상 선택자·이유가 있는 회수 제안과 정상 유지; 확장 입력은 확인 기기 한 개만 제안',
       observed:'제공 원본 연습 '+passed+'/'+checks.length+' · 확장 기기 연습 '+devicesPassed+'/'+deviceChecks.length+' 통과 (실제 회수·경과 시간·심판 판정 아님)'});
+  }
+  if (config.step >= 10) {
+    const checks = await runRestoreAccessChecks();
+    if (!checks.data.aOwnAllowed || !checks.data.bToADenied || !checks.data.bOwnRestoredReadable
+      || !checks.policy.aOwnAllowed || !checks.policy.bToADenied || !checks.policy.itemsRestored) {
+      throw new Error('복구 뒤 정상·금지 자료 요청 확인에 실패했습니다.');
+    }
+    attempts.push({attackId:'restored_note_access_local',
+      expected:'가상 B 메모 복원 뒤 A 본인 조회 허용·B의 A 자료 거부·B 복원 자료 조회 허용',
+      observed:'격리된 합성 사본으로 복원한 뒤 API 확인 통과: A 본인 200 · B→A 404 거부 · B 본인 200 (실제 백업·배포 시험 아님)'});
+    attempts.push({attackId:'restored_policy_access_local',
+      expected:'시험 정책 복원 뒤 A의 GET/PUT/DELETE 허용·B의 A 메모 GET/PUT/DELETE 거부',
+      observed:'격리 시험 정책 복원 뒤 판정기 재호출 통과: A 요청 allow · B 요청 deny/resource_zone (실제 운영 정책 아님)'});
   }
   try {
     const response = await fetch(new URL('/api/notes', app), { redirect: 'error',
