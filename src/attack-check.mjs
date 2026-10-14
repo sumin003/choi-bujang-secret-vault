@@ -2,6 +2,7 @@ import { fixtureRequests } from '../scripts/fixture-7.mjs';
 import { decide } from './decider.mjs';
 import { detect } from './detect.mjs';
 import { checkDetection } from '../scripts/detect-test.mjs';
+import { checkDetection as checkDeviceDetection } from '../scripts/detect-device-test.mjs';
 
 // Record only what was actually requested/returned, never keys, tokens or response bodies.
 export async function runAttackChecks(config) {
@@ -41,9 +42,11 @@ export async function runAttackChecks(config) {
   if (config.step === 9) {
     const checks = await checkDetection(detect);
     const passed = checks.filter(item => item.passed).length;
+    const deviceChecks = await checkDeviceDetection(detect);
+    const devicesPassed = deviceChecks.filter(item => item.passed).length;
     attempts.push({attackId:'detection_proposal_local',
-      expected:'가상 복합 의심의 확인 기기 한 개만 회수 제안; 정상 observe; 확인 정보 부족은 alert',
-      observed:'로컬 탐지 연습 '+passed+'/'+checks.length+' 통과 (실제 회수·경과 시간·심판 판정 아님)'});
+      expected:'제공 원본 계약의 대상 선택자·이유가 있는 회수 제안과 정상 유지; 확장 입력은 확인 기기 한 개만 제안',
+      observed:'제공 원본 연습 '+passed+'/'+checks.length+' · 확장 기기 연습 '+devicesPassed+'/'+deviceChecks.length+' 통과 (실제 회수·경과 시간·심판 판정 아님)'});
   }
   try {
     const response = await fetch(new URL('/api/notes', app), { redirect: 'error',

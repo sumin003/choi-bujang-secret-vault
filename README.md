@@ -4,6 +4,12 @@
 
 ## 9단계 저장점
 
+### 제공된 탐지 계약 호환성 복구
+
+c8f918624009의 제출에서 복합 의심 사건에 propose_revocation이 없다는 결과를 받았습니다. 제공된 원본 사건은 at·method·identity.sub뿐인데 구현이 네트워크·기기·등록 정보를 필수로 요구해 121건·200건 사건을 observe로 돌려줬습니다. 원본 시험 여섯 항목을 변경 없이 복원하고, 세 항목 입력에서는 계약의 propose_revocation·burst_read·subject를 반환하도록 복구했습니다. 원본에 없는 네트워크나 기기 ID를 만들어 채우지 않습니다. subject와 실제 회수 기기를 대조하는 엔진 연결이나 집행을 완료했다고 주장하지 않습니다.
+
+확장 네트워크·기기 입력에는 기존 복합 조건과 확인 기기 한 개 제한을 유지하며 npm run detect:device-test로 별도 검사합니다. 제공 원본 npm run detect:test 6항목, 확장 기기 시험 14항목, npm run test:stage9 26건과 기존 판정기 연습·로컬 빌드가 통과했습니다. 원본 시험이 구현에 맞춰 바뀌지 않았는지도 검사합니다. 회수 API·권한 변경은 추가하지 않았습니다. 새 커밋의 심판 결과는 재제출 후 확인합니다. 아래는 c8f918624009 당시 기록입니다.
+
 GitHub의 eea9d9cb38c4(8단계 저장점)을 기준으로 탐지 입력과 복합 의심 규칙을 추가했습니다. 입력은 가명 사용자·기기·요청 종류·판정과 시각·필요한 가상 신호만 선별합니다. 비정상 가상 네트워크에서 10분 내 GET 120건 초과가 나타난 확인 기기 한 개에만 별도 propose_revocation·burst_read·deviceId 결과를 반환합니다. 정상은 observe, 확인 기기를 특정할 수 없는 복합 의심은 alert입니다. 실제 회수 API·권한 변경·경과 시간 측정은 구현하지 않았습니다. 확장 사건 형식의 심판 호환성과 실제 회수·시간 확인은 심판 검증 대상입니다. 자세한 형식은 [DETECT_EVENTS.md](docs/DETECT_EVENTS.md)를 따릅니다.
 
 aleph.config.json의 step을 9로 올리고 기존 배포 주소·발급자·허용 경로·originalApiUrl·judgeIssuer는 유지했습니다. src/decider.mjs의 기존 18항목 요청·5항목 응답과 RULE_IDS는 변경하지 않았습니다. 계약 밖 role·identity·device 등의 값을 읽지 않는 검사와 JSON 직렬화 후 응답 형식·규칙 ID 검사를 추가했습니다. 단계 9에서 제출 자기 점검이 실행되도록 src/attack-check.mjs도 맞췄습니다.

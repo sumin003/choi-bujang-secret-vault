@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import { detect, readDetectionEvents } from '../src/detect.mjs';
+import {checkDetection} from '../scripts/detect-test.mjs';
 
 const START=Date.UTC(2026,9,1);
 const observe={action:'observe'};
@@ -10,6 +13,26 @@ function reads(count,{owner='learner_fixture',network='unusual',source='judge_fi
   return Array.from({length:count},(_,i)=>({at:new Date(START+i*interval).toISOString(),
     method,identity:{sub:owner},signals:{source,network},deviceId,deviceRegistered:registered}));
 }
+
+test('the unmodified supplied six-case contract is compatible with the exported detector',async()=>{
+  const results=await checkDetection(detect);
+  assert.equal(results.length,6);
+  for(const item of results)assert.equal(item.passed,true,item.name);
+});
+
+test('the supplied detection test has not been changed to fit the implementation',()=>{
+  const source=readFileSync(new URL('../scripts/detect-test.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n');
+  assert.equal(createHash('sha256').update(source).digest('hex'),
+    'dce3531c12cc771918cf53cbd63c4eeaaa66b3aabbdc9c4f4743846872b6ae43');
+});
+
+test('explicit but incomplete network metadata does not fall back into the supplied contract',()=>{
+  const basic=reads(200).map(({deviceId,deviceRegistered,signals,...event})=>event);
+  assert.deepEqual(detect(basic),{action:'propose_revocation',reasonCode:'burst_read',subject:'learner_fixture'});
+  assert.deepEqual(detect(basic.map(e=>({...e,signals:{}}))),observe);
+  assert.deepEqual(detect(basic.map(e=>({...e,signals:{region:'other_fixture_region'}}))),observe);
+  assert.deepEqual(detect(basic.map(e=>({...e,signals:{source:'none',network:'unusual'}}))),observe);
+});
 
 test('suspicion requires both unusual-network evidence and excessive reads',()=>{
   assert.deepEqual(detect(reads(200,{network:'usual'})),observe);

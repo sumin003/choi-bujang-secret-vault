@@ -9,6 +9,7 @@
     "bundle": "node scripts/bundle.mjs",
     "decider:test": "node scripts/decider-test.mjs",
     "detect:test": "node scripts/detect-test.mjs",
+    "detect:device-test": "node scripts/detect-device-test.mjs",
     "fixture:7": "node scripts/fixture-7.mjs",
     "xdr:run": "node scripts/xdr-run.mjs",
     "test:stage8": "node --test test/stage8-decider.test.mjs test/resource-zones.test.mjs",

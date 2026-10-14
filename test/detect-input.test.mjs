@@ -75,10 +75,10 @@ test('rejects missing/invalid metadata without echoing an input value', () => {
   assert.throws(()=>readDetectionEvents([input]),{name:'TypeError',message:'invalid_detection_events'});
 });
 
-test('events without network evidence remain observe even at high volume', () => {
+test('the supplied contract produces its documented proposal without invented metadata', () => {
   const inputs=Array.from({length:200},event);
   assert.equal(readDetectionEvents(inputs).length,200);
-  assert.deepEqual(detect(inputs),{action:'observe'});
+  assert.deepEqual(detect(inputs),{action:'propose_revocation',reasonCode:'burst_read',subject:'learner_fixture'});
 });
 
 test('the input module still loads alone and performs no input logging', async () => {

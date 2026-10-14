@@ -63,7 +63,7 @@ export function readDetectionEvents(events) {
         }
         // Region is intentionally neither accessed nor copied. Missing signal
         // evidence stays missing; it is never defaulted to a usual network.
-        if (Object.keys(selectedSignals).length) selected.signals = selectedSignals;
+        selected.signals = selectedSignals;
       }
       safe.push(selected);
     }
@@ -86,6 +86,26 @@ function exceedsReadLimit(times) {
 
 export function detect(events) {
   const selected = readDetectionEvents(events);
+  // The supplied practice contract has only at/method/identity.sub and uses
+  // subject as its target selector. Do not demand metadata it does not supply,
+  // invent a device ID, or classify absent network evidence as unusual.
+  const suppliedContract = selected.every(event => event.deviceId === undefined
+    && event.deviceRegistered === undefined && event.decision === undefined
+    && event.signals === undefined);
+  if (suppliedContract) {
+    const timesBySubject = new Map();
+    for (const event of selected) {
+      if (event.method !== 'GET') continue;
+      const subject = event.identity.sub;
+      if (!timesBySubject.has(subject)) timesBySubject.set(subject, []);
+      timesBySubject.get(subject).push(Date.parse(event.at));
+    }
+    for (const [subject, times] of timesBySubject) {
+      if (exceedsReadLimit(times))
+        return { action: 'propose_revocation', reasonCode: 'burst_read', subject };
+    }
+    return { action: 'observe' };
+  }
   const readsBySubject = new Map();
   const confirmedDevicesBySubject = new Map();
   for (const event of selected) {
