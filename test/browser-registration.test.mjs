@@ -124,3 +124,15 @@ test('pending request cap reports a fixed 429 error and creates no browser cooki
  const res=response();await handler(request,res);assert.equal(res.code,429);assert.deepEqual(res.body,{error:'DEVICE_REQUEST_LIMIT'});
  assert.doesNotMatch(res.headers['Set-Cookie']??'',/__Host-vault_browser=/);
 });
+
+test('obsolete auto-approved cookie can request a fresh pending UUID without granting access',async()=>{
+ const f=fixture(),first=response();const original=await f.service.request(req(),identity,first);
+ const oldCookie=first.headers['Set-Cookie'],old=[...f.rows.values()][0];
+ old.status='approved';old.reason='verified_recent_password_login';old.approved_at=new Date(time).toISOString();
+ assert.equal((await f.service.status(req(oldCookie),identity)).status,'unverified');
+ const second=response(),pending=await f.service.request(req(oldCookie),identity,second);
+ assert.equal(pending.status,'pending');assert.notEqual(pending.requestId,original.requestId);assert.equal(f.rows.size,2);
+ assert.equal(old.status,'approved');assert.equal(old.reason,'verified_recent_password_login');
+ assert.equal(await checkApprovedDevice(req(second.headers['Set-Cookie']),identity,{approvalService:f.service}),'required');
+ assert.equal((await f.service.status(req(oldCookie),identity)).status,'unverified');
+});

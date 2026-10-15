@@ -9,6 +9,8 @@ const connectionStatus = document.querySelector('#connection-status');
 const devicePanel = document.querySelector('#device-panel');
 const deviceStatus = document.querySelector('#device-approval-status');
 const deviceMessage = document.querySelector('#device-message');
+const deviceRequestRow = document.querySelector('#device-request-row');
+const deviceRequestId = document.querySelector('#device-request-id');
 const requestDevice = document.querySelector('#request-device');
 const checkDeviceButton = document.querySelector('#check-device');
 const vault = document.querySelector('#protected-vault');
@@ -38,6 +40,8 @@ function lockVault(label = '기기 승인 상태: 미확인. 로그인 후 서�
   ++deviceVersion;
   ++notesVersion;
   deviceApproved = false;
+  deviceRequestRow.hidden = true;
+  deviceRequestId.value = '';
   vault.hidden = true;
   editor.hidden = true;
   resetEditor();
@@ -66,6 +70,13 @@ async function deviceFetch(body) {
   return result;
 }
 
+function showDeviceRequest(result) {
+  if (typeof result?.requestId === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(result.requestId)) {
+    deviceRequestId.value = result.requestId;
+    deviceRequestRow.hidden = false;
+  }
+}
+
 async function refreshDeviceStatus(session) {
   const version = deviceVersion;
   try {
@@ -88,6 +99,7 @@ async function refreshDeviceStatus(session) {
         : result.status === 'rejected' ? '이 브라우저의 등록이 거부되었습니다.'
           : '이 브라우저에서 기기 승인을 요청해 주세요.';
     }
+    showDeviceRequest(result);
   } catch (error) {
     if (version === deviceVersion && session === currentSession) {
       lockVault('기기 승인 상태: 서버에서 확인할 수 없습니다.');
@@ -98,14 +110,18 @@ async function refreshDeviceStatus(session) {
 
 async function updateDeviceApproval(requestReview = false) {
   if (deviceBusy || !currentSession) return;
+  const session = currentSession;
   deviceBusy = true;
   requestDevice.disabled = true;
   checkDeviceButton.disabled = true;
   lockVault('기기 승인 상태: 서버에서 확인하는 중입니다.');
   deviceMessage.textContent = requestReview ? '승인 요청을 보내는 중입니다.' : '승인 결과를 확인하는 중입니다.';
   try {
-    if (requestReview) await deviceFetch({ action: 'request' });
-    await refreshDeviceStatus(currentSession);
+    const requested = requestReview ? await deviceFetch({ action: 'request' }) : null;
+    if (session !== currentSession) return;
+    if (requested) showDeviceRequest(requested);
+    await refreshDeviceStatus(session);
+    if (session === currentSession && requested) showDeviceRequest(requested);
   } catch (error) {
     deviceMessage.textContent = error.message || '승인 요청을 완료하지 못했습니다.';
   } finally {

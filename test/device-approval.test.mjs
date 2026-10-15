@@ -21,7 +21,7 @@ test('screen requests pending, checks approval and clears protected data on logo
     if (path === '/api/device') {
       if (!connected) return { ok: false, status: 503, json: async () => ({ error: 'DEVICE_REGISTRATION_NOT_CONNECTED' }) };
       if (init.method === 'POST') { assert.deepEqual(JSON.parse(init.body), { action: 'request' }); requests++; status = 'pending'; }
-      return { ok: true, json: async () => ({ status, requestId: '1'.repeat(64) }) };
+      return { ok: true, json: async () => ({ status, requestId: '11111111-1111-4111-8111-111111111111' }) };
     }
     assert.equal(path, '/api/notes'); assert.equal(status, 'approved'); reads++;
     return { ok: true, status: 200, json: async () => [{ id: NOTE, title: 'fixture title', body: 'fixture body' }] };
@@ -50,6 +50,8 @@ test('screen requests pending, checks approval and clears protected data on logo
   assert.equal(vault.hidden, true); assert.equal(reads, 0);
   await elements.get('#request-device').listeners.get('click')(); await flush(); await flush();
   assert.equal(requests, 1); assert.equal(vault.hidden, true); assert.equal(reads, 0);
+  assert.equal(elements.get('#device-request-row').hidden,false);
+  assert.equal(elements.get('#device-request-id').value,'11111111-1111-4111-8111-111111111111');
   status = 'approved'; await elements.get('#check-device').listeners.get('click')(); await flush(); await flush();
   assert.equal(vault.hidden, false); assert.equal(reads, 1); assert.equal(list.children[0].children[0].textContent, 'fixture title');
   context.navigator.onLine = false; windowEvents.get('offline')();
@@ -62,4 +64,5 @@ test('screen requests pending, checks approval and clears protected data on logo
   assert.equal(vault.hidden, true); assert.match(elements.get('#device-message').textContent, /아직 연결되지/);
   await elements.get('#logout-button').listeners.get('click')(); await flush(); assert.equal(vault.hidden, true);
   assert.equal(authenticated, false);
+  assert.equal(elements.get('#device-request-row').hidden,true);assert.equal(elements.get('#device-request-id').value,'');
 });

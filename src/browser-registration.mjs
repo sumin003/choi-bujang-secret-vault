@@ -62,7 +62,12 @@ export function createBrowserRegistration({ env = process.env, fetchImpl = globa
   }
   async function request(req,identity,res) {
     const existing = await rowFor(req,identity);
-    if (existing) return status(req,identity); // Never review or approve in POST.
+    if (existing) {
+      const previous = await status(req,identity);
+      // Replace obsolete auto-approval records with a new pending request.
+      // Valid approvals and explicit operator rejections are never bypassed.
+      if (previous.status !== 'unverified') return previous;
+    }
     if (typeof res?.setHeader !== 'function') return fail();
     const raw = randomBytes(32).toString('base64url'), hash = createHash('sha256').update(raw).digest('hex');
     const [created] = await store('POST',identity,hash,{browser_hash:hash,user_id:identity.userId,requested_at:new Date(now()).toISOString(),expires_at:new Date(now()+LIFETIME*1000).toISOString()});
