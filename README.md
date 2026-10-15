@@ -6,21 +6,21 @@
 
 BYTE BACK 가상 자료실에 설치형 웹앱 manifest와 아이콘, 오프라인 안내, 기기 승인 요청·결과 화면을 추가했습니다. 설치 표시만으로 승인하지 않습니다. 별도 접속 프로그램·휴대전화·보안 키 등록은 요구하지 않습니다.
 
-### 브라우저 등록과 운영자 승인
+### 브라우저 등록과 서버 승인
 
-기기 승인 요청은 `pending`만 생성하며 상태 조회·로그인·설치 표시로 자동 승인하지 않습니다. HttpOnly·Secure·SameSite=Strict 쿠키는 서버의 브라우저 등록 기록을 찾는 용도이며 서버에는 원본 대신 SHA-256 해시를 보관합니다. 기기 개인키·패스키는 생성하지 않습니다. 물리적 기기 증명이 아닌 브라우저 등록 방식입니다.
+기기 개인키·패스키를 만들지 않습니다. 허용받은 HttpOnly·Secure·SameSite=Strict 쿠키로 브라우저를 식별하며 서버에는 원본 쿠키 대신 SHA-256 해시와 사용자 UUID·등록 상태·만료 시각만 저장합니다. 이는 물리적 기기를 증명하는 인증서 방식이 아니며, 쿠키가 삭제되면 새 브라우저로 취급합니다. 로그인 세션과 별도인 등록 기록은 같은 브라우저·같은 사용자로 다시 로그인해도 유지되며 30일 뒤 만료됩니다. 다른 사용자에게 승인 상태를 공유하지 않습니다.
 
-운영자가 SQL Editor에서 화면의 요청 번호와 사용자를 확인한 뒤 한 건을 승인합니다. 앱 서버에는 승인 상태를 INSERT·UPDATE하거나 운영자 승인 함수를 실행할 권한이 없습니다. 대기 요청은 DB에서 사용자별 잠금으로 최대 5건으로 제한합니다. 승인·취소는 감사 기록과 같은 트랜잭션으로 처리합니다. 기존 자동 승인 기록은 운영자 승인으로 인정하지 않습니다. 다른 메모·다른 서비스·기존 감사 기록은 변경하지 않습니다.
+`POST /api/device`는 `{action:"request"}`만 받고 `pending`을 저장합니다. 클릭만으로 승인하지 않습니다. 이후 `GET /api/device`에서 서버가 공식 Supabase SDK의 `getUser`와 `getClaims`로 같은 사용자·확인된 이메일·현재 토큰의 최근 10분 이내 비밀번호 인증 기록을 확인하는 자동 등록 정책을 실행합니다. 사용자 수정 가능 metadata·본문 role·브라우저 기기 헤더는 승인 근거로 사용하지 않습니다. 조건이 부족하면 대기로 유지하고 다시 로그인하도록 안내합니다. 별도 관리자 승인은 요구하지 않습니다.
 
-상태 표시와 메모·공지·복원 API가 같은 서버 승인 서비스를 사용하며, DB의 운영자 승인 기록·사용자·브라우저 대응·만료를 확인한 결과를 `src/decider.mjs`의 공통 `decideDeviceRegistration` 규칙에 전달합니다. 승인 전·다른 사용자·다른 브라우저·만료·취소는 자료 없는 JSON 403, DB 오류는 JSON 503입니다. 미로그인은 기존 JSON 401이며 소유권·공지 권한 검사도 유지합니다. 엔진용 `decide(request)`의 18항목 입력·5항목 응답은 보존하며 이 자체 승인 절차를 제공 엔진과의 연동이라고 주장하지 않습니다.
+서버에 기록된 승인을 `src/decider.mjs`의 `decideDeviceRegistration`으로 판단한 뒤에만 자료를 엽니다. 자료 API는 대기 기록을 승인으로 바꾸지 않으며 요청마다 등록 기록을 다시 읽습니다. 승인 전·다른 브라우저·다른 사용자·만료·취소는 자료 없는 JSON 403, DB 장애는 JSON 503으로 거부합니다. 기존 소유권·공지 권한 검사를 유지합니다. 엔진용 `decide(request)`의 18항목 입력·5항목 응답은 바꾸지 않으며 이 브라우저 등록 결과를 엔진이 검증한 기기 정보라고 주장하지 않습니다.
 
-설정·한 건 승인·취소·확인 순서는 [운영자 안내](docs/BROWSER_OPERATOR_GUIDE.md)에 기록했습니다. DB 변경은 [BROWSER_OPERATOR_APPROVAL.sql](docs/BROWSER_OPERATOR_APPROVAL.sql)을 따릅니다. 승인 화면은 따로 만들지 않고 운영자가 SQL로 결정합니다. 로그인과 별개인 브라우저 등록 기록은 30일 만료입니다.
+등록 테이블 설정은 [BROWSER_REGISTRATION_SETUP.sql](docs/BROWSER_REGISTRATION_SETUP.sql)에 기록했습니다. RLS를 켜고 PUBLIC·anon·authenticated의 직접 권한을 회수했으며 서버에는 SELECT·INSERT·UPDATE만 부여합니다. 메모·기존 등록부·기존 감사 기록은 변경하지 않습니다.
 
 ### 토큰 저장과 로컬 확인
 
 로그인은 서버의 공식 Supabase SDK로 처리합니다. 로그인·갱신 토큰은 서버 전용 세션 테이블에 암호화해 보관하며 브라우저 응답·localStorage·sessionStorage·IndexedDB에 넣지 않습니다. 브라우저에는 무작위 세션 식별자를 HttpOnly·Secure·SameSite=Strict 쿠키로 보관하고, 서버에는 그 식별자의 해시만 저장합니다. 유효한 세션은 새로고침 후 복원되며 7일 만료 또는 로그아웃 후에는 다시 로그인합니다. 기기 승인과는 별개이며 기기 개인키를 생성하지 않습니다. 이전 SDK 저장 항목은 값을 읽지 않고 삭제합니다. 세션 테이블 설정은 [WEB_SESSION_SETUP.sql](docs/WEB_SESSION_SETUP.sql)에 기록했으며 브라우저 역할의 직접 접근을 막습니다. 확인 명령: `node --test test/web-session.test.mjs test/device-approval.test.mjs`. 배포 후 로그인 → 새로고침 → 로그인 유지 → 로그아웃 → 새로고침 → 로그아웃 유지 순서로 확인합니다.
 
-`aleph.config.json`의 step은 11이며 `GET /api/device`, `POST /api/device` 허용 경로와 기존 배포·발급자·judgeIssuer·원본 API 설정을 유지합니다. 확인 명령: `npm run test:stage11 && npm run decider:test && npm run build -- --local`. 로컬 시험은 실제 API 처리기에 대역 DB를 연결해 승인 전 자료 없음·요청만으로 승인 불가·별도 운영자 승인 뒤 본인 자료 허용·취소 후 거부를 확인합니다. 이 결과는 실제 배포 사용자 시험이나 심판 판정이 아닙니다. 배포 확인 순서: 로그인 → 승인 요청 → 운영자 SQL 승인 → 승인 결과 확인 → 본인 메모 CRUD → 운영자 취소 → 다음 요청 거부입니다. 실제 사용자 브라우저에서 이 순서를 실행한 결과는 미실행입니다. 학습 DB에서 권한 분리·대기만 생성·운영자 승인/취소·감사 2건·여섯 번째 대기 요청 거부를 트랜잭션으로 확인한 뒤 전부 롤백했습니다. 재확인 SQL은 `test/browser-registration-db.sql`이며 실제 사용자 요청의 승인을 대신하지 않습니다.
+`aleph.config.json`의 step은 11이며 `GET /api/device`, `POST /api/device`를 허용 경로에 포함합니다. 배포 주소·발급자·judgeIssuer·원본 자료 API 주소를 유지합니다. 확인 명령: `npm run test:stage11 && npm run decider:test && npm run build -- --local`. 로컬 시험은 실제 API 처리기에 요청을 보내 승인 전 자료 없음, 독립된 서버 검사 뒤 본인 목록 허용, 위조·다른 사용자·만료·취소 거부를 확인합니다. Supabase Auth·DB를 대체한 시험이며 실제 배포의 사용자 로그인 시험과 구분합니다. 배포 후 로그인 → 기기 승인 요청 → 서버 확인 완료 → 본인 메모 조회 → 새로고침 순서로 확인합니다. 다른 브라우저에서는 승인 전에 자료가 없어야 합니다.
 
 ## 10단계 작업 기록
 

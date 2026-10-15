@@ -57,7 +57,6 @@ async function deviceFetch(body) {
   if (session !== currentSession) throw new Error('로그인 상태가 변경되었습니다.');
   const result = await response.json().catch(() => null);
   if (!response.ok || !result) {
-    if (result?.error === 'DEVICE_REQUEST_LIMIT') throw new Error('대기 중인 요청은 최대 5건입니다. 운영자에게 기존 요청 확인을 요청해 주세요.');
     if (result?.error === 'DEVICE_REGISTRATION_NOT_CONNECTED') throw new Error('기기 승인 서버가 아직 연결되지 않았습니다. 자료 접근을 중단했습니다.');
     if (response.status === 401) throw new Error('로그인 상태를 확인할 수 없습니다. 다시 로그인해 주세요.');
     if (response.status === 503) throw new Error('기기 승인 서버를 확인할 수 없습니다. 자료 접근을 중단했습니다.');
@@ -83,8 +82,7 @@ async function refreshDeviceStatus(session) {
         : result.status === 'rejected' ? '기기 승인 상태: 거부됨.'
           : '기기 승인 상태: 미확인. 승인 요청을 진행해 주세요.');
       deviceMessage.textContent = result.status === 'pending'
-        ? ('서버 운영자의 승인을 기다리고 있습니다. 승인 후 “승인 결과 확인”을 눌러 주세요.'
-          + (typeof result.requestId === 'string' ? ' 요청 번호: ' + result.requestId : ''))
+        ? (result.reason === 'recent_login_required' ? '등록 확인을 위해 다시 로그인한 뒤 승인 결과를 확인해 주세요.' : '승인 요청이 접수되었습니다. “승인 결과 확인”을 눌러 주세요.')
         : result.status === 'rejected' ? '이 브라우저의 등록이 거부되었습니다.'
           : '이 브라우저에서 기기 승인을 요청해 주세요.';
     }

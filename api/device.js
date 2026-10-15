@@ -33,7 +33,7 @@ export function createDeviceHandler({ verify,
     } catch { /* Do not log credentials or upstream errors. */ }
     if (identity?.kind !== 'student') return res.status(401).json({ error: 'LOGIN_REQUIRED' });
     try {
-      if (req.method === 'GET') return res.status(200).json(await approvalService.status(req, identity));
+      if (req.method === 'GET') return res.status(200).json(await approvalService.status(req, identity, { review: true }));
       if (!/^application\/json(?:;|$)/i.test(req.headers?.['content-type'] ?? ''))
         return res.status(415).json({ error: 'JSON_REQUIRED' });
       let input;
@@ -43,8 +43,7 @@ export function createDeviceHandler({ verify,
           || Object.keys(input).length !== 1 || input.action !== 'request')
         return res.status(400).json({ error: 'INVALID_REQUEST' });
       return res.status(200).json(await approvalService.request(req, identity, res));
-    } catch (error) {
-      if (error?.message === 'device_request_limit') return res.status(429).json({ error:'DEVICE_REQUEST_LIMIT' });
+    } catch {
       return res.status(503).json({ error: 'DEVICE_REGISTRATION_NOT_CONNECTED' });
     }
   };
