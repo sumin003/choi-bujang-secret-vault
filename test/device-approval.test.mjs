@@ -50,8 +50,8 @@ test('screen requests pending, checks approval and clears protected data on logo
   assert.equal(vault.hidden, true); assert.equal(reads, 0);
   await elements.get('#request-device').listeners.get('click')(); await flush(); await flush();
   assert.equal(requests, 1); assert.equal(vault.hidden, true); assert.equal(reads, 0);
-  assert.equal(elements.get('#device-request-row').hidden,false);
-  assert.equal(elements.get('#device-request-id').value,'11111111-1111-4111-8111-111111111111');
+  assert.equal(html.includes('device-request-row'),false);
+  assert.match(elements.get('#device-message').textContent,/요청 번호: 11111111-1111-4111-8111-111111111111/);
   status = 'approved'; await elements.get('#check-device').listeners.get('click')(); await flush(); await flush();
   assert.equal(vault.hidden, false); assert.equal(reads, 1); assert.equal(list.children[0].children[0].textContent, 'fixture title');
   context.navigator.onLine = false; windowEvents.get('offline')();
@@ -64,5 +64,4 @@ test('screen requests pending, checks approval and clears protected data on logo
   assert.equal(vault.hidden, true); assert.match(elements.get('#device-message').textContent, /아직 연결되지/);
   await elements.get('#logout-button').listeners.get('click')(); await flush(); assert.equal(vault.hidden, true);
   assert.equal(authenticated, false);
-  assert.equal(elements.get('#device-request-row').hidden,true);assert.equal(elements.get('#device-request-id').value,'');
 });
