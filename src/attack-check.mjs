@@ -4,11 +4,12 @@ import { detect } from './detect.mjs';
 import { checkDetection } from '../scripts/detect-test.mjs';
 import { checkDetection as checkDeviceDetection } from '../scripts/detect-device-test.mjs';
 import { runRestoreAccessChecks } from '../scripts/restore-access-check.mjs';
+import { enforceApprovedDevice } from './device-approval.mjs';
 
 // Record only what was actually requested/returned, never keys, tokens or response bodies.
 export async function runAttackChecks(config) {
   if (config.step === 1) return legacyStageOne(config);
-  if (!Number.isInteger(config.step) || config.step < 6 || config.step > 10)
+  if (!Number.isInteger(config.step) || config.step < 6 || config.step > 11)
     throw new Error('이 단계의 자기 점검을 구현해 주세요.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.search || app.hash || app.pathname !== '/')
@@ -62,6 +63,19 @@ export async function runAttackChecks(config) {
     attempts.push({attackId:'restored_policy_access_local',
       expected:'시험 정책 복원 뒤 A의 GET/PUT/DELETE 허용·B의 A 메모 GET/PUT/DELETE 거부',
       observed:'격리 시험 정책 복원 뒤 판정기 재호출 통과: A 요청 allow · B 요청 deny/resource_zone (실제 운영 정책 아님)'});
+  }
+  if (config.step >= 11) {
+    const response = { statusCode: 200, body: null,
+      status(code) { this.statusCode = code; return this; },
+      json(body) { this.body = body; return this; } };
+    const allowed = await enforceApprovedDevice({ headers: {} }, response,
+      { kind: 'student', userId: '00000000-0000-4000-8000-000000000001' });
+    attempts.push({ attackId: 'device_approval_local',
+      expected: '기기 승인 증거가 없는 로그인 요청은 자료 없이 JSON 403',
+      observed: allowed === false && response.statusCode === 403
+        && response.body?.error === 'DEVICE_APPROVAL_REQUIRED'
+        ? '로컬 서버 검사: JSON 403 · 기기 승인 필요 (실제 승인 기기·배포 요청 아님)'
+        : '로컬 서버 검사에서 승인 전 거부를 확인하지 못함' });
   }
   try {
     const response = await fetch(new URL('/api/notes', app), { redirect: 'error',

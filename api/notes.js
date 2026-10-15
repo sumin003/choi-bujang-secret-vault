@@ -1,6 +1,7 @@
 import { enforceXdr } from '../src/xdr-gate.mjs';
 import { randomUUID } from 'node:crypto';
 import { createLoginVerifier } from '../src/verify-login.mjs';
+import { enforceApprovedDevice } from '../src/device-approval.mjs';
 import { decideAuthenticatedResource, exposeResourceDecision } from '../src/decider.mjs';
 import config from '../aleph.config.json' with { type: 'json' };
 let verifyLogin;
@@ -54,6 +55,7 @@ export async function handleNotes(req, res, id) {
   } catch {
     return res.status(401).json({ error: 'LOGIN_REQUIRED' });
   }
+  if (!await enforceApprovedDevice(req, res, identity)) return;
   if (id !== null && (typeof id !== 'string' || !UUID.test(id))) {
     return res.status(400).json({ error: 'INVALID_ID' });
   }

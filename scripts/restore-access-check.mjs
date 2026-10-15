@@ -28,12 +28,12 @@ async function checkNoteRestoreThenAccess(){
     process.env.SUPABASE_URL='https://fixture.example.invalid';
     process.env.SUPABASE_SECRET_KEY='fixture-only';
     const preview=createNoteRestoreHandler({preview:true,verifyLogin:async()=>({kind:'student',userId:B}),
-      enforceRequest:()=>true,callRpc:async(name,payload)=>{
+      enforceRequest:()=>true,approveDevice:async()=>true,callRpc:async(name,payload)=>{
         requireCheck(name==='learning_preview_note_restore' && payload.p_actor===B && payload.p_note_id===B_NOTE,'preview_check_failed');
         return {id:B_NOTE,backupId:BACKUP,contentSha256:HASH,currentSha256:CURRENT,operation:'update'};
       }});
     const restore=createNoteRestoreHandler({verifyLogin:async()=>({kind:'student',userId:B}),
-      enforceRequest:()=>true,callRpc:async(name,payload)=>{
+      enforceRequest:()=>true,approveDevice:async()=>true,callRpc:async(name,payload)=>{
         requireCheck(name==='learning_restore_note' && payload.p_actor===B && payload.p_note_id===B_NOTE
           && payload.p_backup_id===BACKUP && payload.p_content_hash===HASH && payload.p_expected_current===CURRENT,
           'restore_check_failed');
@@ -53,7 +53,7 @@ async function checkNoteRestoreThenAccess(){
     const stripped=source.replace(/^import .*;\n/gm,'');
     const deciderUrl=new URL('../src/decider.mjs',import.meta.url).href;
     const prelude=`import {decideAuthenticatedResource,exposeResourceDecision} from ${JSON.stringify(deciderUrl)};\n`
-      +`const enforceXdr=()=>true,config={},randomUUID=()=>${JSON.stringify(B_NOTE)};\n`
+      +`const enforceApprovedDevice=async()=>true,enforceXdr=()=>true,config={},randomUUID=()=>${JSON.stringify(B_NOTE)};\n`
       +`const createLoginVerifier=()=>async token=>({userId:token==='Bearer A'?${JSON.stringify(A)}:${JSON.stringify(B)},kind:'student'});\n`;
     const module=await import('data:text/javascript;base64,'+Buffer.from(prelude+stripped).toString('base64'));
     globalThis.fetch=async url=>{

@@ -12,7 +12,7 @@ const response=()=>({statusCode:200,headers:{},setHeader(k,v){this.headers[k]=v;
 const request=(input=body,url='/api/restore-notes')=>({method:'POST',url,
   headers:{authorization:'fixture-login','content-type':'application/json'},body:input});
 const create=options=>createNoteRestoreHandler({verifyLogin:async()=>({kind:'student',userId:B}),
-  enforceRequest:()=>true,...options});
+  enforceRequest:()=>true,approveDevice:async()=>true,...options});
 
 test('B의 사전 확인은 한 건의 ID와 해시만 표시하고 사본 내용은 응답하지 않는다',async()=>{
   const handler=create({preview:true,callRpc:async(name,payload)=>{

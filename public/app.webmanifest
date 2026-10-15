@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "BYTE BACK 가상 자료실",
+  "short_name": "BYTE BACK 자료실",
+  "description": "로그인 후 사용하는 BYTE BACK 가상 자료실",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#101a28",
+  "theme_color": "#101a28",
+  "icons": [
+    {
+      "src": "/icons/vault-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/vault-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

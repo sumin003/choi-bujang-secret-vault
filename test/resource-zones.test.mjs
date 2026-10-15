@@ -27,7 +27,7 @@ test('direct announcement handler rejects students, forged roles and query actio
  const source=readFileSync(new URL('../api/announcements.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
  const resource=new URL('../src/resource-access.mjs',import.meta.url).href;
  const deciderUrl=new URL('../src/decider.mjs',import.meta.url).href;
- const prelude='import {decideAuthenticatedResource,exposeResourceDecision} from '+JSON.stringify(deciderUrl)+';\n'+`import {createResourceStore,isStoredInstructor} from ${JSON.stringify(resource)};\nconst enforceXdr=()=>true,createLoginVerifier=()=>()=>null,config={},randomUUID=()=>${JSON.stringify(C)};\n`;
+ const prelude='import {decideAuthenticatedResource,exposeResourceDecision} from '+JSON.stringify(deciderUrl)+';\n'+`import {createResourceStore,isStoredInstructor} from ${JSON.stringify(resource)};\nconst enforceApprovedDevice=async()=>true,enforceXdr=()=>true,createLoginVerifier=()=>()=>null,config={},randomUUID=()=>${JSON.stringify(C)};\n`;
  const {createAnnouncementHandler}=await import('data:text/javascript;base64,'+Buffer.from(prelude+source).toString('base64'));
  const handler=createAnnouncementHandler({store,verifyLogin:async user=>user?{userId:user,kind:'student'}:null});
  const call=async(user,url='/api/announcements/'+C)=>{const r={statusCode:200,headers:{},setHeader(k,v){this.headers[k]=v;},status(n){this.statusCode=n;return this},json(b){this.body=b;return this},end(){return this}};await handler({method:'PUT',url,headers:{authorization:user,'content-type':'application/json'},body:{title:'fixture',body:'fixture',role:'instructor',owner_id:B,owner_kind:'judge'}},r,C);return r;};
@@ -38,7 +38,7 @@ test('direct announcement handler rejects students, forged roles and query actio
 test('direct note API preserves own reads/updates/deletes and rejects another owner and function queries',async()=>{
  const source=readFileSync(new URL('../api/notes.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
  const deciderUrl=new URL('../src/decider.mjs',import.meta.url).href;
- const prelude='import {decideAuthenticatedResource,exposeResourceDecision} from '+JSON.stringify(deciderUrl)+';\n'+'const enforceXdr=()=>true,config={},randomUUID=()=>"'+N+'",createLoginVerifier=()=>async user=>({userId:user,kind:"student"});\n';
+ const prelude='import {decideAuthenticatedResource,exposeResourceDecision} from '+JSON.stringify(deciderUrl)+';\n'+'const enforceApprovedDevice=async()=>true,enforceXdr=()=>true,config={},randomUUID=()=>"'+N+'",createLoginVerifier=()=>async user=>({userId:user,kind:"student"});\n';
  const {handleNotes}=await import('data:text/javascript;base64,'+Buffer.from(prelude+source).toString('base64'));
  const previousFetch=globalThis.fetch,previousUrl=process.env.SUPABASE_URL,previousKey=process.env.SUPABASE_SECRET_KEY;
  let row={id:N,title:'fixture',body:'fixture',owner_id:A};
@@ -75,7 +75,7 @@ test('exported default decider fails closed when trusted ownership bindings are 
 test('single-note routing permits matching dynamic id but rejects function queries and conflicting IDs',async()=>{
  const source=readFileSync(new URL('../api/notes.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
  const deciderUrl=new URL('../src/decider.mjs',import.meta.url).href;
- const prelude='import {decideAuthenticatedResource,exposeResourceDecision} from '+JSON.stringify(deciderUrl)+';\n'+'const enforceXdr=()=>true,config={},randomUUID=()=>null,createLoginVerifier=()=>()=>null;\n';
+ const prelude='import {decideAuthenticatedResource,exposeResourceDecision} from '+JSON.stringify(deciderUrl)+';\n'+'const enforceApprovedDevice=async()=>true,enforceXdr=()=>true,config={},randomUUID=()=>null,createLoginVerifier=()=>()=>null;\n';
  const {resolveNoteId}=await import('data:text/javascript;base64,'+Buffer.from(prelude+source).toString('base64'));
  for(const url of ['/api/notes/'+N,'/api/notes/'+N+'?id='+N,'/api/notes/[id]?id='+N])assert.equal(resolveNoteId({url,query:{id:N}}),N);
  for(const req of [

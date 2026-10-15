@@ -1,4 +1,5 @@
 import { enforceXdr } from './xdr-gate.mjs';
+import { enforceApprovedDevice } from './device-approval.mjs';
 import config from '../aleph.config.json' with { type: 'json' };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -29,7 +30,7 @@ export function createRestoreRpc({ env=process.env, fetchImpl=globalThis.fetch }
 }
 
 export function createNoteRestoreHandler({ preview=false, pathParam=false, verifyLogin, callRpc,
-  enforceRequest=enforceXdr, env=process.env }={}) {
+  enforceRequest=enforceXdr, approveDevice=enforceApprovedDevice, env=process.env }={}) {
   let verifier=verifyLogin;
   const rpc=callRpc ?? createRestoreRpc({env});
   const path=pathParam?'/api/restore/notes/:id':preview?'/api/restore-notes/preview':'/api/restore-notes';
@@ -61,6 +62,7 @@ export function createNoteRestoreHandler({ preview=false, pathParam=false, verif
     if (!identity || !['student','judge'].includes(identity.kind)
       || typeof identity.userId!=='string' || !UUID.test(identity.userId))
       return res.status(401).json({error:'LOGIN_REQUIRED'});
+    if (!await approveDevice(req,res,identity)) return;
     if (!/^application\/json(?:;|$)/i.test(req.headers['content-type'] ?? ''))
       return res.status(415).json({error:'JSON_REQUIRED'});
     let input;

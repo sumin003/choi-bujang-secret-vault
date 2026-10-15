@@ -1,5 +1,6 @@
 import { enforceXdr } from '../src/xdr-gate.mjs';
 import { createLoginVerifier } from '../src/verify-login.mjs';
+import { enforceApprovedDevice } from '../src/device-approval.mjs';
 import { decideAuthenticatedResource, exposeResourceDecision } from '../src/decider.mjs';
 import { createResourceStore, isStoredInstructor } from '../src/resource-access.mjs';
 import config from '../aleph.config.json' with {type:'json'};
@@ -7,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function createAnnouncementHandler({store=createResourceStore(), verifyLogin,
+  approveDevice=enforceApprovedDevice,
   xdr=enforceXdr, makeId=randomUUID}={}) {
   let verifier=verifyLogin;
   return async (req,res,id=null) => {
@@ -27,6 +29,7 @@ export function createAnnouncementHandler({store=createResourceStore(), verifyLo
       identity=await verifier(req.headers?.authorization);
     } catch { /* No token or upstream details in responses/logs. */ }
     if (!identity) return res.status(401).json({error:'LOGIN_REQUIRED'});
+    if (!await approveDevice(req,res,identity)) return;
     try {
       const path='/api/announcements'+(id===null?'':'/'+id);
       const zone=await decideAuthenticatedResource({identity,service:'instructor_announcements',method:req.method,

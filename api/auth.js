@@ -11,7 +11,9 @@ export default async function handler(req, res) {
     && ['password', 'refresh_token'].includes(grant);
   const logoutRequest = action === 'logout' && method === 'POST';
   const userRequest = action === 'user' && method === 'GET';
-  if (!tokenRequest && !logoutRequest && !userRequest)
+  const passkeyRegistration = method === 'POST'
+    && ['passkeys/registration/options', 'passkeys/registration/verify'].includes(action);
+  if (!tokenRequest && !logoutRequest && !userRequest && !passkeyRegistration)
     return res.status(400).json({ code: 'invalid_request', msg: '지원하지 않는 인증 요청입니다.' });
   const source = req.headers?.origin;
   const host = req.headers?.host;
@@ -38,6 +40,14 @@ export default async function handler(req, res) {
         return res.status(400).json({ code: 'invalid_request', msg: '세션 갱신 요청이 올바르지 않습니다.' });
       payload = { refresh_token: input.refresh_token };
     }
+  }
+  if (passkeyRegistration) {
+    if (req.body !== undefined && !/^application\/json(?:;|$)/i.test(req.headers?.['content-type'] ?? ''))
+      return res.status(415).json({ code: 'invalid_request', msg: 'JSON 요청이 필요합니다.' });
+    try { payload = req.body === undefined ? {} : typeof req.body === 'string' ? JSON.parse(req.body) : req.body; } catch {}
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)
+        || JSON.stringify(payload).length > 16000)
+      return res.status(400).json({ code: 'invalid_request', msg: '기기 등록 요청이 올바르지 않습니다.' });
   }
   const headers = { apikey: key, 'Content-Type': 'application/json' };
   if (!tokenRequest) {
@@ -70,6 +80,16 @@ export default async function handler(req, res) {
         token_type: data.token_type, expires_in: data.expires_in, expires_at: data.expires_at, user: data.user });
     }
     if (userRequest) return res.status(200).json(data);
+    if (passkeyRegistration) {
+      if (action.endsWith('/options')) {
+        if (typeof data.challenge_id !== 'string' || !data.options) throw new Error();
+        return res.status(200).json({ challenge_id:data.challenge_id, options:data.options,
+          expires_at:data.expires_at });
+      }
+      if (typeof data.id !== 'string') throw new Error();
+      return res.status(200).json({ id:data.id, friendly_name:data.friendly_name,
+        created_at:data.created_at });
+    }
     return res.status(200).json({});
   } catch {
     return res.status(502).json({ code: 'unexpected_failure', msg: '인증 서버에 연결할 수 없습니다.' });
