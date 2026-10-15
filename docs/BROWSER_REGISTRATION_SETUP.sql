@@ -12,4 +12,5 @@ create table public.learning_browser_registrations (
 );
 alter table public.learning_browser_registrations enable row level security;
 revoke all on table public.learning_browser_registrations from public, anon, authenticated, service_role;
-grant select, insert, update on table public.learning_browser_registrations to service_role;
+grant select on table public.learning_browser_registrations to service_role;
+-- Next run BROWSER_OPERATOR_APPROVAL.sql. Do not deploy before that upgrade.

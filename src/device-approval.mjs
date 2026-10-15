@@ -5,10 +5,9 @@ const DEVICE_ID = /^[a-f0-9]{16}$/;
 const REVIEW_STATES = new Set(['unverified', 'pending', 'rejected']);
 const unavailable = () => { throw new Error('device_registration_not_connected'); };
 
-// Server-side integration seam only. No real enrollment transport is supplied
-// by docs/DECIDER_REQUEST.md. A provider must authenticate the engine's device
-// context itself; HTTP headers/body, login/session IDs and browser fingerprints
-// are never substitutes. Production remains disconnected until that exists.
+// Optional adapter for separately authenticated engine context. The deployed
+// application below uses the operator-reviewed server registration service.
+// Browser headers, login/session IDs and fingerprints are never engine proof.
 export function createDeviceApprovalService({ provider = null } = {}) {
   async function verifiedDevice(req, identity) {
     if (!identity || !['student', 'judge'].includes(identity.kind))
