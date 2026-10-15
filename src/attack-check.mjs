@@ -66,16 +66,17 @@ export async function runAttackChecks(config) {
   }
   if (config.step >= 11) {
     const response = { statusCode: 200, body: null,
+      setHeader() {},
       status(code) { this.statusCode = code; return this; },
       json(body) { this.body = body; return this; } };
     const allowed = await enforceApprovedDevice({ headers: {} }, response,
       { kind: 'student', userId: '00000000-0000-4000-8000-000000000001' });
-    attempts.push({ attackId: 'device_approval_local',
-      expected: '기기 승인 증거가 없는 로그인 요청은 자료 없이 JSON 403',
-      observed: allowed === false && response.statusCode === 403
-        && response.body?.error === 'DEVICE_APPROVAL_REQUIRED'
-        ? '로컬 서버 검사: JSON 403 · 기기 승인 필요 (실제 승인 기기·배포 요청 아님)'
-        : '로컬 서버 검사에서 승인 전 거부를 확인하지 못함' });
+    attempts.push({ attackId: 'device_connection_local',
+      expected: '실제 기기 확인 연결이 없으면 자료 없이 JSON 503으로 중단',
+      observed: allowed === false && response.statusCode === 503
+        && response.body?.error === 'DEVICE_REGISTRATION_NOT_CONNECTED'
+        ? '로컬 서버 검사: JSON 503 · 기기 확인 연결 없음; 실제 등록 기기 승인 흐름은 미완료'
+        : '로컬 서버 검사에서 미연결 시 중단을 확인하지 못함' });
   }
   try {
     const response = await fetch(new URL('/api/notes', app), { redirect: 'error',

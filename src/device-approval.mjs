@@ -1,106 +1,63 @@
-import { createHash, createHmac, hkdfSync, timingSafeEqual } from 'node:crypto';
+import { decideDeviceRegistration } from './decider.mjs';
 
-const COOKIE = '__Host-vault_device';
-const LIFETIME = 5 * 60;
-const HASH = /^[a-f0-9]{64}$/;
+const DEVICE_ID = /^[a-f0-9]{16}$/;
+const REVIEW_STATES = new Set(['unverified', 'pending', 'rejected']);
+const unavailable = () => { throw new Error('device_registration_not_connected'); };
 
-function digest(value) {
-  return createHash('sha256').update(value).digest('hex');
+// Server-side integration seam only. No real enrollment transport is supplied
+// by docs/DECIDER_REQUEST.md. A provider must authenticate the engine's device
+// context itself; HTTP headers/body, login/session IDs and browser fingerprints
+// are never substitutes. Production remains disconnected until that exists.
+export function createDeviceApprovalService({ provider = null } = {}) {
+  async function verifiedDevice(req, identity) {
+    if (!identity || !['student', 'judge'].includes(identity.kind))
+      throw new Error('login_required');
+    if (typeof provider?.readVerifiedRegistration !== 'function') return unavailable();
+    const result = await provider.readVerifiedRegistration(req, identity);
+    if (!result || !DEVICE_ID.test(result.deviceId ?? '')
+        || typeof result.deviceRegistered !== 'boolean') return unavailable();
+    return { deviceId: result.deviceId, deviceRegistered: result.deviceRegistered };
+  }
+  async function status(req, identity) {
+    const device = await verifiedDevice(req, identity);
+    const decision = decideDeviceRegistration(device.deviceRegistered);
+    if (decision.decision === 'allow') return { status: 'approved' };
+    if (typeof provider.readApprovalStatus !== 'function') return { status: 'unverified' };
+    const review = await provider.readApprovalStatus(device.deviceId, identity);
+    if (!REVIEW_STATES.has(review)) return unavailable();
+    return { status: review };
+  }
+  async function request(req, identity) {
+    const device = await verifiedDevice(req, identity);
+    if (device.deviceRegistered) return { status: 'approved' };
+    if (typeof provider.requestApproval !== 'function') return unavailable();
+    // A request may create a review only. It must not turn a click into approval.
+    const result = await provider.requestApproval(device.deviceId, identity);
+    if (result?.status !== 'pending') return unavailable();
+    return { status: 'pending' };
+  }
+  return Object.freeze({ status, request });
 }
 
-export function credentialHash(credentialId) {
-  if (typeof credentialId !== 'string' || !/^[A-Za-z0-9_-]{16,1024}$/.test(credentialId))
-    return null;
-  return digest(credentialId);
-}
+// This default has no trusted provider. It never fabricates a registered device.
+const service = createDeviceApprovalService();
+export const readDeviceApproval = (req, identity) => service.status(req, identity);
+export const requestDeviceApproval = (req, identity) => service.request(req, identity);
 
-function signingKey(secret) {
-  if (typeof secret !== 'string' || !secret) throw new Error('device_unavailable');
-  return hkdfSync('sha256', secret, 'vault-device-approval', 'device-session-v1', 32);
-}
-
-export function makeDeviceCookie({ authorization, userId, hash, secret, now = Date.now() }) {
-  if (!HASH.test(hash) || !userId || !authorization) throw new Error('device_unavailable');
-  const payload = Buffer.from(JSON.stringify({ u: userId, h: hash, t: digest(authorization),
-    e: Math.floor(now / 1000) + LIFETIME })).toString('base64url');
-  const signature = createHmac('sha256', signingKey(secret)).update(payload).digest('base64url');
-  return `${COOKIE}=${payload}.${signature}; Max-Age=${LIFETIME}; Path=/; HttpOnly; Secure; SameSite=Strict`;
-}
-
-function readDeviceCookie(req, identity, secret, now) {
-  const authorization = req.headers?.authorization;
-  if (typeof authorization !== 'string') return null;
-  const header = req.headers?.cookie ?? '';
-  const match = new RegExp(`(?:^|;\\s*)${COOKIE}=([^;]+)`).exec(header);
-  if (!match) return null;
-  const [payload, signature, extra] = match[1].split('.');
-  if (extra || !payload || !signature || payload.length > 1000) return null;
-  try {
-    const expected = createHmac('sha256', signingKey(secret)).update(payload).digest();
-    const supplied = Buffer.from(signature, 'base64url');
-    if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) return null;
-    const record = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-    if (record.u !== identity.userId || record.t !== digest(authorization)
-        || !HASH.test(record.h ?? '') || !Number.isSafeInteger(record.e)
-        || record.e <= Math.floor(now / 1000) || record.e > Math.floor(now / 1000) + LIFETIME) return null;
-    return record.h;
-  } catch { return null; }
-}
-
-export async function deviceRecord({ userId, hash, secret, url, fetchImpl = fetch }) {
-  if (!HASH.test(hash) || !/^[0-9a-f-]{36}$/i.test(userId)) throw new Error('device_unavailable');
-  const base = new URL(url);
-  if (base.protocol !== 'https:' || base.username || base.password) throw new Error('device_unavailable');
-  const endpoint = new URL('/rest/v1/learning_device_approvals', base);
-  endpoint.search = new URLSearchParams({ select: 'credential_hash,status', user_id: 'eq.' + userId,
-    credential_hash: 'eq.' + hash, limit: '1' }).toString();
-  const response = await fetchImpl(endpoint, { headers: { apikey: secret },
-    cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(10000) });
-  if (!response.ok) throw new Error('device_unavailable');
-  const rows = await response.json();
-  if (!Array.isArray(rows) || rows.length > 1) throw new Error('device_unavailable');
-  const row = rows[0];
-  if (row && (row.credential_hash !== hash || !['pending', 'approved', 'rejected'].includes(row.status)))
-    throw new Error('device_unavailable');
-  return row?.status ?? null;
-}
-
-export async function requestDeviceApproval({ userId, hash, secret, url, fetchImpl = fetch }) {
-  const existing = await deviceRecord({ userId, hash, secret, url, fetchImpl });
-  if (existing) return existing;
-  const base = new URL(url);
-  const endpoint = new URL('/rest/v1/learning_device_approvals', base);
-  const response = await fetchImpl(endpoint, { method: 'POST',
-    headers: { apikey: secret, 'Content-Type': 'application/json',
-      Prefer: 'return=minimal' },
-    body: JSON.stringify({ user_id: userId, credential_hash: hash, status: 'pending' }),
-    cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(10000) });
-  if (response.status === 409) return deviceRecord({ userId, hash, secret, url, fetchImpl });
-  if (!response.ok) throw new Error('device_unavailable');
-  return 'pending';
-}
-
-export async function checkApprovedDevice(req, identity, {
-  secret = process.env.SUPABASE_SECRET_KEY, url = process.env.SUPABASE_URL,
-  fetchImpl = fetch, now = Date.now(),
-} = {}) {
-  // Judge tokens are independently verified by the existing judge issuer and
-  // are never exposed to the student's browser or device enrollment flow.
-  if (identity?.kind === 'judge') return 'approved';
-  if (identity?.kind !== 'student') return 'required';
-  const hash = readDeviceCookie(req, identity, secret, now);
-  if (!hash) return 'required';
-  try {
-    return await deviceRecord({ userId: identity.userId, hash, secret, url, fetchImpl }) === 'approved'
-      ? 'approved' : 'required';
-  } catch { return 'unavailable'; }
+export async function checkApprovedDevice(req, identity, { approvalService = service } = {}) {
+  try { return (await approvalService.status(req, identity)).status === 'approved' ? 'approved' : 'required'; }
+  catch { return 'unavailable'; }
 }
 
 export async function enforceApprovedDevice(req, res, identity, options) {
   const result = await checkApprovedDevice(req, identity, options);
-  if (result === 'approved') return true;
+  const decision = decideDeviceRegistration(result === 'approved');
+  res.setHeader('X-Device-Decision', decision.decision);
+  res.setHeader('X-Device-Rule', decision.ruleIds[0]);
+  res.setHeader('X-Device-Reason', result === 'unavailable' ? 'device_registration_not_connected' : decision.reasonCode);
+  if (decision.decision === 'allow') return true;
   res.status(result === 'unavailable' ? 503 : 403).json({
-    error: result === 'unavailable' ? 'DEVICE_STATUS_UNAVAILABLE' : 'DEVICE_APPROVAL_REQUIRED',
+    error: result === 'unavailable' ? 'DEVICE_REGISTRATION_NOT_CONNECTED' : 'DEVICE_APPROVAL_REQUIRED',
   });
   return false;
 }

@@ -4,13 +4,23 @@
 
 ## 11단계 저장점
 
-BYTE BACK 가상 자료실에 설치형 웹앱 manifest와 아이콘, 연결이 끊겼을 때의 안내, 기기 승인 상태와 요청 화면을 추가했습니다. 웹앱 설치 자체는 기기 승인 증거가 아닙니다. 승인 전에는 메모 화면을 숨기고 서버도 자료 API에 JSON 403 `DEVICE_APPROVAL_REQUIRED`를 돌려줍니다. 기존 메모 읽기·추가·수정·삭제와 소유권 검사는 승인된 기기의 로그인 요청에서 유지합니다.
+BYTE BACK 가상 자료실에 설치형 웹앱 manifest와 아이콘, 오프라인 안내, 기기 승인 요청·결과 화면을 추가했습니다. 설치 표시만으로 승인하지 않습니다. 별도 접속 프로그램·휴대전화·보안 키 등록은 요구하지 않습니다.
 
-로그인 사용자는 화면의 **기기용 패스키 등록 → 기기 승인 요청 → 승인 결과 확인** 순서로 진행합니다. Supabase Auth가 서명된 패스키 증명을 검증하며, 서버는 기기에 묶인 인증 수단의 요청을 `learning_device_approvals`에 `pending`으로 기록합니다. 승인 버튼만으로 권한이 생기지 않습니다. 별도 신뢰 채널에서 사용자와 요청을 확인한 관리자가 [STAGE11_DEVICE_APPROVAL.sql](docs/STAGE11_DEVICE_APPROVAL.sql)의 SQL을 검토해 승인 상태를 바꿔야 합니다. 승인 뒤 다시 기기 인증 수단으로 확인하면 서버가 승인 행을 재조회하고 자료실을 엽니다. 기기 개인키는 브라우저 저장소나 Git에 넣지 않습니다.
+### 잘못된 승인 방식 제거
 
-`aleph.config.json`의 step은 11이며 `GET /api/device`, `POST /api/device`가 허용 경로에 추가됐습니다. 기존 배포 주소, Supabase 로그인 발급자, `judgeIssuer`, 원본 자료 API 주소와 이전 경로는 유지합니다. 서버는 `SUPABASE_URL`과 `SUPABASE_SECRET_KEY`를 환경변수에서만 읽습니다. 실제 배포의 패스키 활성화와 승인된 실기기 요청은 별도 확인이 필요합니다.
+로그인 토큰·로그인 세션 ID를 기기 ID로 사용하는 코드와 매 로그인마다 승인행을 만드는 코드를 제거했습니다. 브라우저 쿠키·브라우저가 보낸 기기 헤더·본문의 등록 여부도 승인 근거로 사용하지 않습니다. 로그인과 기기 승인을 분리하고, 같은 확인 기기의 승인 기록은 새 로그인에서도 유지하는 내부 연결 구조로 수정했습니다. 임의의 사용자 번호·IP·지문으로 기기 ID를 만들지 않습니다. 이전 수동 세션 승인 SQL은 활성 구현에서 제거했으며 학습 DB의 기존 행과 다른 자료는 변경하지 않았습니다.
 
-다시 실행: `node --test test/device-approval.test.mjs && npm run test:stage8 && npm run test:stage9 && npm run test:stage10 && npm run decider:test && npm run build -- --local`. 화면에서는 로그인 후 **기기 승인 요청**을 누릅니다. 정상 결과는 승인 전 자료가 없고, 검토 후 승인된 기기의 새 증명에서 기존 메모가 표시되는 것입니다. 미승인·거절·승인 철회·위조한 확인값은 자료 없이 거부되어야 합니다. 로컬 모의 화면·API 확인과 기기 승인 시험 2건은 통과했으며 실제 배포·실기기 승인을 증명하는 결과는 아닙니다.
+### 실제 기기 확인 연결은 미완료
+
+`docs/DECIDER_REQUEST.md`는 제공 엔진이 확인한 `deviceId`와 `deviceRegistered`를 판정기에 전달하는 계약을 정의합니다. 이 저장소에는 브라우저의 승인 요청·결과 조회를 그 엔진에 연결하는 서버 경로가 없습니다. 따라서 `src/device-approval.mjs`의 기본 승인 서비스에는 실제 제공자를 설정하지 않았습니다. 로그인한 사용자의 `GET/POST /api/device`와 보호 자료 요청은 기기 확인 연결이 없으면 JSON 503 `DEVICE_REGISTRATION_NOT_CONNECTED`로 중단하고 자료를 표시하지 않습니다. 이 작업본을 실제 승인 기기에서 정상 동작하는 완성본으로 기록하지 않습니다.
+
+내부 `createDeviceApprovalService`는 서버에서만 설정하는 제공자의 `readVerifiedRegistration` 결과를 검사합니다. 확인된 기기 ID와 boolean 등록 상태를 `src/decider.mjs`의 공통 `decideDeviceRegistration` 규칙에 전달합니다. 제공자의 상태 조회·승인 요청 연결이 준비되면 화면은 **기기 승인 요청 → 서버 검토 → 승인 결과 확인**으로 진행합니다. 이것은 연결을 위한 내부 인터페이스이며 외부 엔진에 같은 이름의 API가 존재한다고 주장하지 않습니다. 실제 출처 검증을 구현하기 전에는 헤더나 화면 상수로 이 제공자를 대체하면 안 됩니다. 미등록은 자료 없는 JSON 403이며 미연결은 JSON 503입니다. 기존 소유권·공지 권한 검사와 판정기 18항목 입력·5항목 응답은 유지합니다.
+
+### 토큰 저장과 로컬 확인
+
+로그인은 공식 Supabase SDK 흐름을 유지하며 `persistSession: false`, `detectSessionInUrl: false`로 설정했습니다. 토큰은 실행 중 메모리에만 유지하고 localStorage·sessionStorage·IndexedDB·쿠키에 새로 저장하지 않습니다. 이전 SDK의 정해진 저장 항목은 값을 읽지 않고 삭제하며 서버는 이전 승인 쿠키를 만료시킵니다. 기기 개인키를 생성하거나 저장하지 않습니다. 새로고침·창 종료 후 재로그인이 필요하지만 그것이 기기 승인 기록을 지우거나 새 승인을 요구하는 근거는 아닙니다.
+
+`aleph.config.json`의 step은 11이며 `GET /api/device`, `POST /api/device`를 허용 경로에 포함합니다. 배포 주소·발급자·judgeIssuer·원본 자료 API 주소를 유지합니다. 다시 실행: `node --test test/device-approval.test.mjs && npm run test:stage8 && npm run test:stage9 && npm run test:stage10 && npm run decider:test && npm run build -- --local`. 테스트용 엔진 대역으로 같은 기기의 재로그인 시 승인 유지, 다른 기기 거부, 승인 전 자료 없음, 승인 후 본인 메모 표시, 승인 취소와 위조값 거부를 확인합니다. 이 모의 시험은 실제 제공 엔진이나 승인 기기의 배포 시험을 완료한 증거가 아닙니다. 기본 화면에서는 **기기 승인 요청** 또는 **승인 결과 확인**을 눌렀을 때 미연결 안내가 나오며 자료가 없어야 합니다.
 
 ## 10단계 작업 기록
 

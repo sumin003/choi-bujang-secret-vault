@@ -68,14 +68,15 @@
     </section>
     <section id="device-panel" class="auth-panel" hidden aria-labelledby="device-heading">
       <h2 id="device-heading">기기 승인</h2>
-      <p>이 기기의 인증 수단을 등록한 뒤 승인을 요청하세요. 승인 결과는 서버에서 확인합니다.</p>
+      <p>기기 승인을 요청하고 서버가 확인한 등록 상태를 확인합니다.</p>
       <div class="note-actions">
-        <button id="register-device" type="button">기기용 패스키 등록</button>
         <button id="request-device" type="button">기기 승인 요청</button>
         <button id="check-device" type="button">승인 결과 확인</button>
       </div>
       <p id="device-message" role="status" aria-live="polite"></p>
-      <p>패스키 등록이나 요청 버튼만으로 자료 접근이 허용되지 않습니다.</p>
+      <p>승인 기록은 로그인과 별도로 기기에 연결되어야 합니다. 기기 확인 서버가 연결되지 않은 동안에는 자료실이 열리지 않습니다.</p>
+      <p>요청 버튼만으로 승인되지 않습니다. 승인 전에는 보호 자료를 표시하지 않습니다.</p>
+      <p>로그인 정보는 실행 중 메모리에만 유지합니다. 새로고침하거나 창을 닫으면 다시 로그인해야 합니다.</p>
     </section>
     <div id="protected-vault" hidden>
     <section id="note-editor" class="auth-panel" hidden aria-labelledby="note-heading">

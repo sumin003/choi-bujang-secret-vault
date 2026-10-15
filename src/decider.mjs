@@ -237,11 +237,18 @@ function forbiddenEngineZone(request) {
   // permissions must never promote an engine request into a notice writer.
   return resource===RESOURCE_IDS.instructorAnnouncements && request.method!=='GET';
 }
+// Shared registration rule. HTTP callers pass only the result of their server
+// lookup; engine callers pass the engine-validated contract boolean.
+export function decideDeviceRegistration(registered) {
+  return {decision:registered===true?'allow':'deny',
+    reasonCode:registered===true?'approved':'device_not_registered',ruleIds:['device_registered']};
+}
 export function createBaseDecider({now=()=>Date.now(), authorizeResource=createZoneAuthorizer()}={}) {
   return async request => {
-    if (request?.deviceRegistered !== true) {
+    const registration=decideDeviceRegistration(request?.deviceRegistered);
+    if (registration.decision!=='allow') {
       return {schema:'aleph.decision.v1',requestId:request?.requestId,decision:'deny',
-        reasonCode:'device_not_registered',ruleIds:['device_registered']};
+        reasonCode:registration.reasonCode,ruleIds:registration.ruleIds};
     }
     if (!normalRequest(request, now())) return starterDeny(request);
     let authorized = false;
