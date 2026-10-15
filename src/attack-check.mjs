@@ -74,7 +74,7 @@ export async function runAttackChecks(config) {
     attempts.push({ attackId: 'unregistered_browser_local',
       expected: '브라우저 등록 쿠키가 없으면 자료 없이 JSON 403으로 거부',
       observed: allowed === false && response.statusCode === 403
-        && response.body?.error === 'DEVICE_APPROVAL_REQUIRED'
+        && response.body?.error === 'DEVICE_NOT_APPROVED'
         ? '로컬 서버 검사: 등록 쿠키 없는 요청 JSON 403 거부 (실제 배포 승인 시험 아님)'
         : '로컬 서버 검사에서 미등록 브라우저 거부를 확인하지 못함' });
   }

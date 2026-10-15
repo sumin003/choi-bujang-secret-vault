@@ -1,4 +1,3 @@
-import { resolveSessionAuthorization } from '../src/web-session.mjs';
 import { enforceXdr } from '../src/xdr-gate.mjs';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 import { enforceApprovedDevice } from '../src/device-approval.mjs';
@@ -27,8 +26,7 @@ export function createAnnouncementHandler({store=createResourceStore(), verifyLo
     let identity;
     try {
       verifier ??= createLoginVerifier({config,supabaseSecretKey:process.env.SUPABASE_SECRET_KEY});
-      const authorization=req.headers?.authorization ?? (typeof req.headers?.cookie==='string'
-        ? await resolveSessionAuthorization(req) : undefined);
+      const authorization=req.headers?.authorization;
       identity=await verifier(authorization);
     } catch { /* No token or upstream details in responses/logs. */ }
     if (!identity) return res.status(401).json({error:'LOGIN_REQUIRED'});

@@ -49,12 +49,7 @@ export function createNoteRestoreHandler({ preview=false, pathParam=false, verif
       res.setHeader('Allow','POST');
       return res.status(405).json({error:'METHOD_NOT_ALLOWED'});
     }
-    let authorization=req.headers?.authorization;
-    if (authorization===undefined && typeof req.headers?.cookie==='string') {
-      try { const {resolveSessionAuthorization}=await import('./web-session.mjs');
-        authorization=await resolveSessionAuthorization(req); }
-      catch { return res.status(503).json({error:'RESTORE_UNAVAILABLE'}); }
-    }
+    const authorization=req.headers?.authorization;
     if (typeof authorization!=='string') return res.status(401).json({error:'LOGIN_REQUIRED'});
     let identity;
     try {
