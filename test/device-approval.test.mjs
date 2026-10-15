@@ -56,13 +56,13 @@ test('same verified device keeps approval across logins; another device/user is 
 
 test('unconfigured transport and forged browser claims never become verified registration', async () => {
   const fake = request(); Object.assign(fake.headers, { 'x-device-id': DEVICE,
-    'x-device-registered': 'true', cookie: '__Host-vault_device=v2.fake' });
+    'x-device-registered': 'true', cookie: '__Host-vault_device=v2.fake; __Host-vault_browser=' + 'A'.repeat(43) });
   fake.deviceRegistered = true; fake.deviceId = DEVICE;
   const res = response(); assert.equal(await enforceApprovedDevice(fake, res, identity), false);
-  assert.equal(res.code, 403); assert.deepEqual(res.body, { error: 'DEVICE_APPROVAL_REQUIRED' });
+  assert.equal(res.code, 503); assert.deepEqual(res.body, { error: 'DEVICE_REGISTRATION_NOT_CONNECTED' });
   assert.equal(res.headers['X-Device-Decision'], 'deny');
   const handler = await deviceHandler({});
-  const status = response(); await handler(fake, status); assert.equal(status.code, 200); assert.deepEqual(status.body, { status: 'unverified' });
+  const status = response(); await handler(fake, status); assert.equal(status.code, 503); assert.deepEqual(status.body, { error: 'DEVICE_REGISTRATION_NOT_CONNECTED' });
   const requested = response(); await handler(request('POST', { action: 'request' }), requested);
   assert.equal(requested.code, 503); assert.match(requested.headers['Set-Cookie'], /Max-Age=0/);
   for (const value of [false, undefined, 'true', 1, {}]) assert.equal(decideDeviceRegistration(value).decision, 'deny');
@@ -158,4 +158,11 @@ test('screen requests pending, checks approval and clears protected data on logo
   assert.equal(vault.hidden, true); assert.match(elements.get('#device-message').textContent, /아직 연결되지/);
   await elements.get('#logout-button').listeners.get('click')(); await flush(); assert.equal(vault.hidden, true);
   assert.equal(authenticated, false);
+});
+
+
+test('production approval service never imports browser registration or treats login as device approval', () => {
+  const source = readFileSync(new URL('../src/device-approval.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /import .*browser-registration|createBrowserRegistration|recent_password_login/);
+  assert.match(source, /const service = createDeviceApprovalService\(\)/);
 });

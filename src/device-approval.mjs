@@ -1,5 +1,4 @@
 import { decideDeviceRegistration } from './decider.mjs';
-import { createBrowserRegistration } from './browser-registration.mjs';
 
 const DEVICE_ID = /^[a-f0-9]{16}$/;
 const REVIEW_STATES = new Set(['unverified', 'pending', 'rejected']);
@@ -40,8 +39,8 @@ export function createDeviceApprovalService({ provider = null } = {}) {
   return Object.freeze({ status, request });
 }
 
-// The browser-cookie registration is separate from engine device evidence.
-const service = createBrowserRegistration();
+// No engine approval transport is documented. Do not substitute cookies or login for engine approval.
+const service = createDeviceApprovalService();
 export const readDeviceApproval = (req, identity, options) => service.status(req, identity, options);
 export const requestDeviceApproval = (req, identity, res) => service.request(req, identity, res);
 
