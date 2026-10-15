@@ -154,6 +154,18 @@ src/decider.mjs의 device_registered 규칙은 엔진이 전달한 request.devic
 
 2026-10-13 위 명령을 실제 실행해 두 항목 통과를 확인했고, 판정기를 직접 호출해 등록 요청 allow·approved와 미등록 요청 deny·device_not_registered를 대조했습니다. 이는 로컬 가상 요청 연습이며 실제 접속이나 심판 통과 증거가 아닙니다. 실제 미등록 기기 공격의 확인은 심판이 맡습니다. 설정의 step을 6으로 변경했고 기존 자료실 주소·브라우저 화면·로그인 발급자·허용 경로·원본 API 주소·judgeIssuer는 유지합니다. 제출 묶음의 직접 HTTP 점검은 실행 결과만 기록하며 접근 제한이나 통신 오류는 미확인으로 남깁니다. 브라우저에서 기기 상태를 위조하거나 실제 공격을 수행하는 절차는 포함하지 않습니다.
 
+## 보너스 xdr-03 저장점
+
+2026-10-16 `npm run xdr:run -- known-cve`를 실행해 `xdr/known-cve/result.json`을 갱신했습니다. 경보 24건: block 8 · alert 8 · record 8. 정상 이벤트 8건 중 block은 0건입니다.
+
+읽기 모듈은 다섯 항목만 추출하며 비밀값처럼 보이는 내용을 가립니다. 패턴은 CVE-2021-44228 및 MITRE ATT&CK T1190 근거를 포함합니다. 독립형 decide.mjs는 import·파일 입출력·외부 호출 없이 판단하며 점검 도구 흔적만으로 차단하지 않습니다.
+
+respond.mjs는 명확한 후보만 만료 시각과 근거 경보 번호가 있는 거부 규칙으로 만들고 정제한 알림을 한 줄씩 기록합니다. 공유 주소의 정상 이벤트를 보호하며 기존 규칙을 보존합니다. createConnectedDecider는 기존 판정기에 거부 검사만 더하는 연결 부품입니다. 자료실 서버의 기존 XDR 요청 경로는 변경하지 않았습니다.
+
+`node --test test/xdr-known-cve-respond.test.mjs` 5건 통과. 임시 경로와 경보 시각을 사용한 로컬 재생에서 명확한 공격 8건 거부, 애매한 시도 8건 알림 및 통과, 정상 8건 통과를 확인했습니다. 배포 환경 실측이나 심판 판정은 아닙니다. 원본 경보와 기존 자료실 기능은 보존했습니다.
+
+다시 실행: `npm run xdr:run -- known-cve`. 연결 검사: `node --test test/xdr-known-cve-respond.test.mjs`.
+
 ## 보너스 xdr-02 저장점
 
 2026-10-12 `npm run xdr:run -- web-injection`를 다시 실행해 xdr/web-injection/result.json을 갱신했습니다. 경보 26건의 counts는 block 8 · alert 9 · record 9이며 정상 이벤트 9건 중 block은 0건입니다. 실행 오류는 없었습니다.
