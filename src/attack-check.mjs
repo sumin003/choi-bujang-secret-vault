@@ -71,12 +71,12 @@ export async function runAttackChecks(config) {
       json(body) { this.body = body; return this; } };
     const allowed = await enforceApprovedDevice({ headers: {} }, response,
       { kind: 'student', userId: '00000000-0000-4000-8000-000000000001' });
-    attempts.push({ attackId: 'device_connection_local',
-      expected: '엔진 승인 연동이 없으면 자료 없이 JSON 503으로 중단',
-      observed: allowed === false && response.statusCode === 503
-        && response.body?.error === 'DEVICE_REGISTRATION_NOT_CONNECTED'
-        ? '로컬 서버 검사: 엔진 연동 미제공으로 JSON 503 거부 (실제 승인 기기 시험 미실행)'
-        : '로컬 서버 검사에서 연동 부재 시 거부를 확인하지 못함' });
+    attempts.push({ attackId: 'unregistered_browser_local',
+      expected: '브라우저 등록 쿠키가 없으면 자료 없이 JSON 403으로 거부',
+      observed: allowed === false && response.statusCode === 403
+        && response.body?.error === 'DEVICE_APPROVAL_REQUIRED'
+        ? '로컬 서버 검사: 등록 쿠키 없는 요청 JSON 403 거부 (실제 배포 승인 시험 아님)'
+        : '로컬 서버 검사에서 미등록 브라우저 거부를 확인하지 못함' });
   }
   try {
     const response = await fetch(new URL('/api/notes', app), { redirect: 'error',
