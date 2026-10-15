@@ -19,7 +19,8 @@
     "test:restore-preview": "node --test test/restore-preview.test.mjs",
     "restore:apply": "node scripts/restore-trial.mjs",
     "test:restore": "node --test test/restore-preview.test.mjs test/restore-trial.test.mjs",
-    "test:stage10": "node --test test/restore-preview.test.mjs test/restore-trial.test.mjs test/note-restore.test.mjs test/restore-access-regression.test.mjs test/policy-snapshot.test.mjs"
+    "test:stage10": "node --test test/restore-preview.test.mjs test/restore-trial.test.mjs test/note-restore.test.mjs test/restore-access-regression.test.mjs test/policy-snapshot.test.mjs",
+    "test:stage11": "node --test test/browser-registration.test.mjs test/device-approval.test.mjs test/web-session.test.mjs"
   },
   "engines": {
     "node": ">=22"

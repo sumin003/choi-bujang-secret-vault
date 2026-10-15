@@ -59,10 +59,10 @@ test('unconfigured transport and forged browser claims never become verified reg
     'x-device-registered': 'true', cookie: '__Host-vault_device=v2.fake' });
   fake.deviceRegistered = true; fake.deviceId = DEVICE;
   const res = response(); assert.equal(await enforceApprovedDevice(fake, res, identity), false);
-  assert.equal(res.code, 503); assert.deepEqual(res.body, { error: 'DEVICE_REGISTRATION_NOT_CONNECTED' });
+  assert.equal(res.code, 403); assert.deepEqual(res.body, { error: 'DEVICE_APPROVAL_REQUIRED' });
   assert.equal(res.headers['X-Device-Decision'], 'deny');
   const handler = await deviceHandler({});
-  const status = response(); await handler(fake, status); assert.equal(status.code, 503);
+  const status = response(); await handler(fake, status); assert.equal(status.code, 200); assert.deepEqual(status.body, { status: 'unverified' });
   const requested = response(); await handler(request('POST', { action: 'request' }), requested);
   assert.equal(requested.code, 503); assert.match(requested.headers['Set-Cookie'], /Max-Age=0/);
   for (const value of [false, undefined, 'true', 1, {}]) assert.equal(decideDeviceRegistration(value).decision, 'deny');
@@ -117,10 +117,14 @@ test('screen requests pending, checks approval and clears protected data on logo
   }
   const document = { querySelector(selector) { if (!elements.has(selector)) elements.set(selector, new Element()); return elements.get(selector); },
     createElement() { return new Element(); } };
-  let status = 'unverified', reads = 0, requests = 0, authChanged, connected = true;
-  const session = { user: { id: USER }, access_token: 'example-token' };
-  const client = { auth: { onAuthStateChange(callback) { authChanged = callback; }, getSession: async () => ({ data: { session } }) } };
+  let status = 'unverified', reads = 0, requests = 0, connected = true, authenticated = true;
   const fetch = async (path, init) => {
+    assert.equal(init.credentials, 'same-origin');
+    assert.equal(init.headers.Authorization, undefined);
+    if (path.startsWith('/api/auth?action=')) {
+      if (path.endsWith('logout')) authenticated = false;
+      return { ok: true, json: async () => ({ authenticated }) };
+    }
     if (path === '/api/device') {
       if (!connected) return { ok: false, status: 503, json: async () => ({ error: 'DEVICE_REGISTRATION_NOT_CONNECTED' }) };
       if (init.method === 'POST') { assert.deepEqual(JSON.parse(init.body), { action: 'request' }); requests++; status = 'pending'; }
@@ -136,12 +140,10 @@ test('screen requests pending, checks approval and clears protected data on logo
   assert.match(html, /id="protected-vault" hidden/);
   const removed = [];
   const storage = { removeItem(key) { removed.push(key); }, getItem() { throw new Error('storage_read'); }, setItem() { throw new Error('token_persisted'); } };
-  let sdkOptions;
   const context = { localStorage: storage, sessionStorage: storage, document, fetch, navigator: { onLine: true }, window: { addEventListener() {} },
-    location: { origin: 'https://fixture.invalid' }, URL, Headers, sdk: { createClient: (_url, _key, options) => { sdkOptions = options; return client; } } };
-  await vm.runInNewContext('(async()=>{' + source.replace("await import('https://esm.sh/@supabase/supabase-js@2.117.2')", 'globalThis.sdk') + '})()', context);
-  assert.equal(sdkOptions.auth.persistSession, false);
-  assert.equal(sdkOptions.auth.detectSessionInUrl, false);
+    location: { origin: 'https://fixture.invalid' }, URL, Headers };
+  await vm.runInNewContext('(async()=>{' + source + '})()', context);
+  assert.equal(/access_token|refresh_token|createClient/.test(source), false);
   assert.ok(removed.includes('sb-cysbomadvuwrqsteohuq-auth-token'));
   const flush = () => new Promise(resolve => setImmediate(resolve)); await flush();
   const vault = elements.get('#protected-vault'), list = elements.get('#notes');
@@ -154,5 +156,6 @@ test('screen requests pending, checks approval and clears protected data on logo
   assert.equal(vault.hidden, true); assert.equal(reads, 1); assert.match(list.children[0].textContent, /기기 승인 후/);
   connected = false; await elements.get('#check-device').listeners.get('click')(); await flush(); await flush();
   assert.equal(vault.hidden, true); assert.match(elements.get('#device-message').textContent, /아직 연결되지/);
-  authChanged('SIGNED_OUT', null); await flush(); assert.equal(vault.hidden, true);
+  await elements.get('#logout-button').listeners.get('click')(); await flush(); assert.equal(vault.hidden, true);
+  assert.equal(authenticated, false);
 });

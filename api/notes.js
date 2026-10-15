@@ -1,3 +1,4 @@
+import { resolveSessionAuthorization } from '../src/web-session.mjs';
 import { enforceXdr } from '../src/xdr-gate.mjs';
 import { randomUUID } from 'node:crypto';
 import { createLoginVerifier } from '../src/verify-login.mjs';
@@ -42,7 +43,11 @@ export async function handleNotes(req, res, id) {
     res.setHeader('Allow', allowed.join(', '));
     return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
   }
-  const authorization = req.headers?.authorization;
+  let authorization = req.headers?.authorization;
+  if (authorization === undefined && typeof req.headers?.cookie === 'string') {
+    try { authorization = await resolveSessionAuthorization(req); }
+    catch { return res.status(503).json({ error: 'NOTES_UNAVAILABLE' }); }
+  }
   if (typeof authorization !== 'string') return res.status(401).json({ error: 'LOGIN_REQUIRED' });
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY;

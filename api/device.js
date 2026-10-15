@@ -1,3 +1,4 @@
+import { resolveSessionAuthorization } from '../src/web-session.mjs';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 import { readDeviceApproval, requestDeviceApproval } from '../src/device-approval.mjs';
 import config from '../aleph.config.json' with { type: 'json' };
@@ -9,7 +10,7 @@ export function createDeviceHandler({ verify,
   secret = process.env.SUPABASE_SECRET_KEY } = {}) {
   return async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Vary', 'Authorization');
+    res.setHeader('Vary', 'Authorization, Cookie');
     // Clear only the obsolete cookie from the earlier, incorrect implementation.
     res.setHeader('Set-Cookie', '__Host-vault_device=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Strict');
     let target;
@@ -20,17 +21,19 @@ export function createDeviceHandler({ verify,
       res.setHeader('Allow', 'GET, POST');
       return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
     }
-    if (req.method === 'POST' && req.headers?.origin
-        && req.headers.origin !== 'https://' + req.headers.host)
+    if (req.method === 'POST' && ((req.headers?.origin && req.headers.origin !== 'https://' + req.headers.host)
+        || req.headers?.['sec-fetch-site'] === 'cross-site'))
       return res.status(403).json({ error: 'INVALID_ORIGIN' });
     let identity;
     try {
       if (!verify) verifyLogin ??= createLoginVerifier({ config, supabaseSecretKey: secret });
-      identity = await (verify ?? verifyLogin)(req.headers?.authorization);
+      const authorization = req.headers?.authorization ?? (typeof req.headers?.cookie === 'string'
+        ? await resolveSessionAuthorization(req) : undefined);
+      identity = await (verify ?? verifyLogin)(authorization);
     } catch { /* Do not log credentials or upstream errors. */ }
     if (identity?.kind !== 'student') return res.status(401).json({ error: 'LOGIN_REQUIRED' });
     try {
-      if (req.method === 'GET') return res.status(200).json(await approvalService.status(req, identity));
+      if (req.method === 'GET') return res.status(200).json(await approvalService.status(req, identity, { review: true }));
       if (!/^application\/json(?:;|$)/i.test(req.headers?.['content-type'] ?? ''))
         return res.status(415).json({ error: 'JSON_REQUIRED' });
       let input;
@@ -39,7 +42,7 @@ export function createDeviceHandler({ verify,
       if (!input || typeof input !== 'object' || Array.isArray(input)
           || Object.keys(input).length !== 1 || input.action !== 'request')
         return res.status(400).json({ error: 'INVALID_REQUEST' });
-      return res.status(200).json(await approvalService.request(req, identity));
+      return res.status(200).json(await approvalService.request(req, identity, res));
     } catch {
       return res.status(503).json({ error: 'DEVICE_REGISTRATION_NOT_CONNECTED' });
     }

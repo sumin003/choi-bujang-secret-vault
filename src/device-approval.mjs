@@ -1,4 +1,5 @@
 import { decideDeviceRegistration } from './decider.mjs';
+import { createBrowserRegistration } from './browser-registration.mjs';
 
 const DEVICE_ID = /^[a-f0-9]{16}$/;
 const REVIEW_STATES = new Set(['unverified', 'pending', 'rejected']);
@@ -39,10 +40,10 @@ export function createDeviceApprovalService({ provider = null } = {}) {
   return Object.freeze({ status, request });
 }
 
-// This default has no trusted provider. It never fabricates a registered device.
-const service = createDeviceApprovalService();
-export const readDeviceApproval = (req, identity) => service.status(req, identity);
-export const requestDeviceApproval = (req, identity) => service.request(req, identity);
+// The browser-cookie registration is separate from engine device evidence.
+const service = createBrowserRegistration();
+export const readDeviceApproval = (req, identity, options) => service.status(req, identity, options);
+export const requestDeviceApproval = (req, identity, res) => service.request(req, identity, res);
 
 export async function checkApprovedDevice(req, identity, { approvalService = service } = {}) {
   try { return (await approvalService.status(req, identity)).status === 'approved' ? 'approved' : 'required'; }

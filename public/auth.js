@@ -48,13 +48,13 @@ function lockVault(label = '기기 승인 상태: 미확인. 로그인 후 서�
 }
 
 async function deviceFetch(body) {
-  const token = currentSession?.access_token;
-  if (!token) throw new Error('로그인 후 이용해 주세요.');
-  const headers = { Authorization: 'Bearer ' + token };
+  const session = currentSession;
+  if (!session?.user) throw new Error('로그인 후 이용해 주세요.');
+  const headers = {};
   if (body) headers['Content-Type'] = 'application/json';
   const response = await fetch('/api/device', { method: body ? 'POST' : 'GET', headers,
     body: body ? JSON.stringify(body) : undefined, cache: 'no-store', credentials: 'same-origin' });
-  if (token !== currentSession?.access_token) throw new Error('로그인 상태가 변경되었습니다.');
+  if (session !== currentSession) throw new Error('로그인 상태가 변경되었습니다.');
   const result = await response.json().catch(() => null);
   if (!response.ok || !result) {
     if (result?.error === 'DEVICE_REGISTRATION_NOT_CONNECTED') throw new Error('기기 승인 서버가 아직 연결되지 않았습니다. 자료 접근을 중단했습니다.');
@@ -82,8 +82,8 @@ async function refreshDeviceStatus(session) {
         : result.status === 'rejected' ? '기기 승인 상태: 거부됨.'
           : '기기 승인 상태: 미확인. 승인 요청을 진행해 주세요.');
       deviceMessage.textContent = result.status === 'pending'
-        ? '승인 요청이 접수되었습니다. 승인 후 “승인 결과 확인”을 눌러 주세요.'
-        : result.status === 'rejected' ? '승인 요청이 거부되었습니다. 관리자에게 확인해 주세요.'
+        ? (result.reason === 'recent_login_required' ? '등록 확인을 위해 다시 로그인한 뒤 승인 결과를 확인해 주세요.' : '승인 요청이 접수되었습니다. “승인 결과 확인”을 눌러 주세요.')
+        : result.status === 'rejected' ? '이 브라우저의 등록이 거부되었습니다.'
           : '이 브라우저에서 기기 승인을 요청해 주세요.';
     }
   } catch (error) {
@@ -138,15 +138,16 @@ function resetEditor() {
 }
 
 async function requestNote(path, method = 'GET', input) {
-  const token = currentSession?.access_token;
-  if (!token) throw new Error('로그인 후 이용해 주세요.');
+  const session = currentSession;
+  if (!session?.user) throw new Error('로그인 후 이용해 주세요.');
   if (!deviceApproved) throw new Error('기기 승인 후 이용해 주세요.');
-  const headers = { Authorization: 'Bearer ' + token };
+  const headers = {};
   if (input) headers['Content-Type'] = 'application/json';
-  const response = await fetch(path, { method, headers, cache: 'no-store',
+  const response = await fetch(path, { method, headers, credentials: 'same-origin', cache: 'no-store',
     body: input ? JSON.stringify(input) : undefined });
-  if (token !== currentSession?.access_token) throw new Error('로그인 상태가 변경되었습니다.');
+  if (session !== currentSession) throw new Error('로그인 상태가 변경되었습니다.');
   if (!response.ok) {
+    if (response.status === 401) render(null);
     if (response.status === 403 || response.status === 503) {
       const details = await response.clone().json().catch(() => null);
       if (['DEVICE_APPROVAL_REQUIRED', 'DEVICE_REGISTRATION_NOT_CONNECTED'].includes(details?.error)) {
@@ -193,7 +194,7 @@ async function loadNotes(session) {
     list.replaceChildren(item);
   };
   show(session ? '가상 자료를 불러오는 중입니다.' : '로그인 후 자료를 확인할 수 있습니다.');
-  if (!session?.access_token) return;
+  if (!session?.user) return;
   try {
     const notes = await requestNote('/api/notes');
     if (version !== notesVersion) return;
@@ -286,35 +287,18 @@ try {
     'sb-cysbomadvuwrqsteohuq-auth-token-code-verifier', 'sb-cysbomadvuwrqsteohuq-auth-token-user']) {
     try { globalThis.localStorage?.removeItem(key); globalThis.sessionStorage?.removeItem(key); } catch {}
   }
-  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.117.2');
-  const supabase = createClient(location.origin, 'server-auth-relay', {
-    auth: { persistSession: false, detectSessionInUrl: false, autoRefreshToken: true },
-    global: {
-      fetch: (input, init) => {
-        const url = new URL(typeof input === 'string' ? input : input.url ?? String(input));
-        const action = url.pathname.replace('/auth/v1/', '');
-        if (url.origin !== location.origin || !['token', 'logout', 'user'].includes(action))
-          throw new Error('지원하지 않는 인증 요청입니다.');
-        const target = new URL('/api/auth', location.origin);
-        target.searchParams.set('action', action);
-        if (url.searchParams.has('grant_type'))
-          target.searchParams.set('grant_type', url.searchParams.get('grant_type'));
-        const headers = new Headers(init?.headers);
-        headers.delete('apikey');
-        if (headers.get('Authorization') === 'Bearer server-auth-relay')
-          headers.delete('Authorization');
-        return fetch(target, { ...init, headers, cache: 'no-store', redirect: 'error' });
-      },
-    },
-  });
+  async function authFetch(action, body) {
+    const response = await fetch('/api/auth?action=' + action, {
+      method: action === 'session' ? 'GET' : 'POST', credentials: 'same-origin', cache: 'no-store',
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await response.json();
+    if (!response.ok) throw { code: data?.code, status: response.status };
+    return data;
+  }
   requestDevice.addEventListener('click', () => void updateDeviceApproval(true));
   checkDeviceButton.addEventListener('click', () => void updateDeviceApproval());
-  // The SDK manages credentials, sessions and refresh tokens.
-  // The server verifies the SDK token before returning any notes.
-  supabase.auth.onAuthStateChange((_event, session) => render(session));
-  const { data, error } = await supabase.auth.getSession();
-  if (error) message.textContent = reason(error);
-  render(data?.session ?? null);
 
   form.addEventListener('submit', async event => {
     event.preventDefault();
@@ -323,19 +307,13 @@ try {
     loginButton.disabled = true;
     message.textContent = '로그인 중입니다.';
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.value.trim(),
-        password: password.value,
-      });
-      if (error) {
-        message.textContent = reason(error);
-      } else {
-        render(data.session);
-        message.textContent = '로그인했습니다.';
-        logoutButton.focus();
-      }
-    } catch {
-      message.textContent = '서버에 연결할 수 없습니다. 네트워크 상태를 확인해 주세요.';
+      const data = await authFetch('login', { email: email.value.trim(), password: password.value });
+      if (!data.authenticated) throw {};
+      render({ user: { authenticated: true } });
+      message.textContent = '로그인했습니다.';
+      logoutButton.focus();
+    } catch (error) {
+      message.textContent = reason(error);
     } finally {
       password.value = '';
       busy = false;
@@ -350,21 +328,20 @@ try {
     logoutButton.disabled = true;
     message.textContent = '로그아웃 중입니다.';
     try {
-      const { error } = await supabase.auth.signOut({ scope: 'local' });
-      if (error) message.textContent = reason(error);
-      else {
-        render(null);
-        message.textContent = '로그아웃했습니다.';
-        email.focus();
-      }
-    } catch {
-      message.textContent = '로그아웃 요청을 완료하지 못했습니다. 네트워크 상태를 확인해 주세요.';
+      await authFetch('logout');
+      render(null);
+      message.textContent = '로그아웃했습니다.';
+      email.focus();
+    } catch (error) {
+      message.textContent = reason(error);
     } finally {
       busy = false;
       loginButton.disabled = false;
       logoutButton.disabled = false;
     }
   });
+  const restored = await authFetch('session');
+  render(restored.authenticated ? { user: { authenticated: true } } : null);
 } catch {
   state.textContent = '로그인 기능을 불러오지 못했습니다.';
   message.textContent = '네트워크 상태를 확인한 뒤 새로고침해 주세요.';

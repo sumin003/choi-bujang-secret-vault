@@ -49,7 +49,13 @@ export function createNoteRestoreHandler({ preview=false, pathParam=false, verif
       res.setHeader('Allow','POST');
       return res.status(405).json({error:'METHOD_NOT_ALLOWED'});
     }
-    if (typeof req.headers?.authorization!=='string') return res.status(401).json({error:'LOGIN_REQUIRED'});
+    let authorization=req.headers?.authorization;
+    if (authorization===undefined && typeof req.headers?.cookie==='string') {
+      try { const {resolveSessionAuthorization}=await import('./web-session.mjs');
+        authorization=await resolveSessionAuthorization(req); }
+      catch { return res.status(503).json({error:'RESTORE_UNAVAILABLE'}); }
+    }
+    if (typeof authorization!=='string') return res.status(401).json({error:'LOGIN_REQUIRED'});
     let identity;
     try {
       if (!verifier) {
@@ -57,7 +63,7 @@ export function createNoteRestoreHandler({ preview=false, pathParam=false, verif
         const { createLoginVerifier }=await import('./verify-login.mjs');
         verifier=createLoginVerifier({config,supabaseSecretKey:env.SUPABASE_SECRET_KEY});
       }
-      identity=await verifier(req.headers.authorization);
+      identity=await verifier(authorization);
     } catch { return res.status(401).json({error:'LOGIN_REQUIRED'}); }
     if (!identity || !['student','judge'].includes(identity.kind)
       || typeof identity.userId!=='string' || !UUID.test(identity.userId))
