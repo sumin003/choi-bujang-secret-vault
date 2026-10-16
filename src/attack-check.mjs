@@ -50,10 +50,20 @@ export async function runAttackChecks(config) {
   if (config.step >= 11) attempts.push({attackId:'unregistered_browser_local',
     expected:'별도 서버 시험에서 미등록 브라우저 자료 접근 거부', observed:'not_run'});
   try {
-    const response = await fetch(new URL('/api/notes', app), { method: 'GET', redirect: 'error',
+    const requestUrl = new URL('/api/notes', app).href;
+    const response = await fetch(requestUrl, { method: 'GET', redirect: 'error',
       signal: AbortSignal.timeout(10000), cache: 'no-store', headers: { Accept: 'application/json' } });
+    // Do not report an execution proxy/protection page as the notes API response.
+    let apiResponse = false;
+    if ((response.headers.get('content-type') ?? '').includes('application/json')) {
+      const data = await response.json().catch(() => null);
+      apiResponse = data !== null && (response.headers.has('x-vercel-id')
+        || ([401, 403].includes(response.status) && data?.error === 'LOGIN_REQUIRED'
+          && Object.keys(data).every(key => ['error', 'reason'].includes(key))));
+    }
+    if (response.url && response.url !== requestUrl) apiResponse = false;
     attempts.push({ attackId: 'anonymous_note_read', expected: '미로그인 목록 요청은 HTTP 401 또는 403 및 JSON 오류',
-      observed: 'HTTP ' + response.status });
+      observed: apiResponse ? 'HTTP ' + response.status : 'not_run' });
   } catch {
     attempts.push({ attackId: 'anonymous_note_read', expected: '미로그인 목록 요청은 HTTP 401 또는 403 및 JSON 오류',
       observed: 'not_run' });
