@@ -26,6 +26,7 @@ test('screen requests pending, checks approval and clears protected data on logo
     if (path === '/api/operations') {
       assert.equal(status, 'approved');
       return {ok:true,status:200,json:async()=>({schema:'aleph.operations.summary.v1',requestId:'11111111-1111-4111-8111-111111111111',checkedAt:'2026-10-16T00:00:00.000Z',
+        verification:{counts:{PASS:0,FAIL:0,NOT_RUN:41},supplementary:[],rows:Array.from({length:41},(_,i)=>({id:'T'+i,stage:1,request:'fixture request',expected:'fixture expectation',status:'NOT_RUN',httpStatus:null,reason:'not_executed',requestId:null,targetRequestId:null,checkedAt:null}))},
         rules:{ids:['device_registered']},detection:{savedFixtureResults:[]},
         recovery:{candidateVersion:'a'.repeat(40)}})};
     }
@@ -65,9 +66,12 @@ test('screen requests pending, checks approval and clears protected data on logo
   assert.ok(summary.children.some(item => item.textContent.includes('규칙 시험 미실행')));
   assert.ok(summary.children.every(item => !item.textContent.includes('fixture body')));
   assert.match(elements.get('#operations-status').textContent,/HTTP 200/);
+  assert.equal(elements.get('#verification-rows').children.length,41);
+  assert.match(elements.get('#verification-counts').textContent,/PASS 0 \/ FAIL 0 \/ NOT_RUN 41/);
   assert.match(elements.get('#operations-status').textContent,/요청 ID 11111111-1111-4111-8111-111111111111/);
   context.navigator.onLine = false; windowEvents.get('offline')();
   assert.equal(summary.children.length,0);
+  assert.equal(elements.get('#verification-rows').children.length,0);
   assert.equal(vault.hidden,true); assert.equal(reads,1);
   assert.match(elements.get('#connection-status').textContent,/오프라인에서는 볼 수 없습니다/);
   context.navigator.onLine = true; windowEvents.get('online')();

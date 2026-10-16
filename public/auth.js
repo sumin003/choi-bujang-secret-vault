@@ -15,6 +15,8 @@ const vault = document.querySelector('#protected-vault');
 const operationsStatus = document.querySelector('#operations-status');
 const operationsSummary = document.querySelector('#operations-summary');
 const operationsRefresh = document.querySelector('#refresh-operations');
+const verificationRows = document.querySelector('#verification-rows');
+const verificationCounts = document.querySelector('#verification-counts');
 let operationsVersion = 0;
 let deviceVersion = 0;
 let deviceApproved = false;
@@ -42,6 +44,8 @@ function lockVault(label = '기기 승인 상태: 미확인. 로그인 후 서�
   ++operationsVersion;
   operationsStatus.textContent = '미실행';
   operationsSummary.replaceChildren();
+  verificationRows.replaceChildren();
+  verificationCounts.textContent = "";
   ++deviceVersion;
   ++notesVersion;
   deviceApproved = false;
@@ -57,6 +61,8 @@ function lockVault(label = '기기 승인 상태: 미확인. 로그인 후 서�
 async function loadOperations(session) {
   const version = ++operationsVersion;
   operationsSummary.replaceChildren();
+  verificationRows.replaceChildren();
+  verificationCounts.textContent = "";
   operationsStatus.textContent = '확인 중';
   try {
     if (!deviceApproved || !session?.access_token) throw new Error();
@@ -87,10 +93,30 @@ async function loadOperations(session) {
     operationsSummary.replaceChildren(...lines.map(text => {
       const li = document.createElement('li'); li.textContent = text; return li;
     }));
+    if (data.verification) {
+      const counts = data.verification.counts;
+      verificationCounts.textContent = '41종 · PASS ' + counts.PASS + ' / FAIL ' + counts.FAIL + ' / NOT_RUN ' + counts.NOT_RUN;
+      verificationRows.replaceChildren(...data.verification.rows.map(row => {
+        const tr = document.createElement('tr');
+        for (const value of [row.id + ' · ' + row.stage + '단계', row.request, row.expected,
+          (row.httpStatus === null ? '응답 없음' : 'HTTP ' + row.httpStatus) + ' · ' + row.reason,
+          (row.requestId ?? '—') + ' / ' + (row.targetRequestId ?? '미제공'),row.checkedAt ?? '—',row.status]) {
+          const td = document.createElement('td'); td.textContent = value; tr.append(td);
+        }
+        return tr;
+      }));
+      for (const probe of data.verification.supplementary) {
+        const li = document.createElement('li');
+        li.textContent = '추가 익명 단건 점검(41종 외): ' + probe.status + ' · HTTP ' + (probe.httpStatus ?? '없음') + ' · ' + probe.reason;
+        operationsSummary.append(li);
+      }
+    }
     operationsStatus.textContent = 'GET /api/operations · HTTP 200 · 요청 ID ' + data.requestId + ' · 조회 시각 ' + data.checkedAt;
   } catch {
     if (version === operationsVersion && session === currentSession) {
       operationsSummary.replaceChildren();
+  verificationRows.replaceChildren();
+  verificationCounts.textContent = "";
       operationsStatus.textContent = '확인 실패 · 실행 결과 미확인';
     }
   }

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createOperationsHandler} from '../api/operations.js';
+import {createOperationsHandler as makeHandler} from '../api/operations.js';
+const createOperationsHandler = options => makeHandler({runChecks:async()=>({rows:[],counts:{PASS:0,FAIL:0,NOT_RUN:41},supplementary:[]}),...options});
 const response=()=>({headers:{},setHeader(k,v){this.headers[k]=v;},status(s){this.code=s;return this;},json(data){this.data=data;return this;}});
 test('summary requires login and server device approval, with no partial data on refusal',async()=>{
   for(const mode of ['anonymous','pending','unavailable']){

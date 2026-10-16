@@ -1,0 +1,289 @@
+[
+  {
+    "id": "T01",
+    "stage": 1,
+    "kind": "정상",
+    "request": "GET /",
+    "expected": "기존 자료실 첫 화면·로그인 화면 유지"
+  },
+  {
+    "id": "T02",
+    "stage": 2,
+    "kind": "금지",
+    "request": "GET /data.json",
+    "expected": "404 또는 메모 0건; 과거 공개 상태를 재현하지 않음"
+  },
+  {
+    "id": "T03",
+    "stage": 2,
+    "kind": "정상",
+    "request": "GET /aleph.json",
+    "expected": "200, 확인 대상 배포 커밋·단계 일치"
+  },
+  {
+    "id": "T04",
+    "stage": 2,
+    "kind": "정상",
+    "request": "GET / 응답 헤더",
+    "expected": "X-Content-Type-Options: nosniff"
+  },
+  {
+    "id": "T05",
+    "stage": 3,
+    "kind": "정상",
+    "request": "POST /api/auth?action=token&grant_type=password — A 로그인",
+    "expected": "정상 로그인; 토큰 원문 기록 금지"
+  },
+  {
+    "id": "T06",
+    "stage": 3,
+    "kind": "금지",
+    "request": "같은 로그인 경로 — 잘못된 비밀번호",
+    "expected": "인증 거부·화면 오류"
+  },
+  {
+    "id": "T07",
+    "stage": 3,
+    "kind": "금지",
+    "request": "GET /api/notes — 로그인 없음",
+    "expected": "JSON 401/403, 자료 없음"
+  },
+  {
+    "id": "T08",
+    "stage": 3,
+    "kind": "정상",
+    "request": "GET /api/notes — A·승인 기기",
+    "expected": "A 소유 목록만 반환"
+  },
+  {
+    "id": "T09",
+    "stage": 3,
+    "kind": "정상",
+    "request": "POST /api/notes — A·승인 기기",
+    "expected": "201, 서버가 검증한 A 소유로 생성"
+  },
+  {
+    "id": "T10",
+    "stage": 3,
+    "kind": "정상",
+    "request": "GET /api/notes/{시험 메모 ID} — A",
+    "expected": "200, 본인 메모; 원문은 결과표에 복사하지 않음"
+  },
+  {
+    "id": "T11",
+    "stage": 3,
+    "kind": "정상",
+    "request": "PUT /api/notes/{시험 메모 ID} — A",
+    "expected": "200, 본인 시험 메모 수정"
+  },
+  {
+    "id": "T12",
+    "stage": 3,
+    "kind": "정상",
+    "request": "DELETE 후 GET /api/notes/{삭제 ID} — A",
+    "expected": "삭제 204 후 조회 404"
+  },
+  {
+    "id": "T13",
+    "stage": 4,
+    "kind": "금지",
+    "request": "GET /api/notes/{A 메모 ID} — B",
+    "expected": "404, 자료 없음"
+  },
+  {
+    "id": "T14",
+    "stage": 4,
+    "kind": "금지",
+    "request": "PUT /api/notes/{A 메모 ID} — B",
+    "expected": "404, A 메모 불변"
+  },
+  {
+    "id": "T15",
+    "stage": 4,
+    "kind": "금지",
+    "request": "DELETE /api/notes/{A 메모 ID} — B",
+    "expected": "404, A 메모 보존"
+  },
+  {
+    "id": "T16",
+    "stage": 4,
+    "kind": "금지",
+    "request": "POST 메모에서 owner_id 위조",
+    "expected": "입력 거부 또는 무시; 서버 확인 사용자 소유 유지"
+  },
+  {
+    "id": "T17",
+    "stage": 4,
+    "kind": "금지",
+    "request": "PUT 메모에서 owner_id 변경 시도",
+    "expected": "입력 거부 또는 무시; 기존 소유자 유지"
+  },
+  {
+    "id": "T18",
+    "stage": 5,
+    "kind": "금지",
+    "request": "원본 메모 REST API 직접 요청 — anon",
+    "expected": "직접 권한 없음, 메모 반환 없음"
+  },
+  {
+    "id": "T19",
+    "stage": 5,
+    "kind": "금지",
+    "request": "원본 메모 REST API 직접 요청 — authenticated",
+    "expected": "직접 권한 없음, 메모 반환 없음"
+  },
+  {
+    "id": "T20",
+    "stage": 6,
+    "kind": "정상",
+    "request": "가상 판정기 — 등록 기기·정상 단건 요청",
+    "expected": "allow·approved"
+  },
+  {
+    "id": "T21",
+    "stage": 6,
+    "kind": "금지",
+    "request": "가상 판정기 — 미등록 기기",
+    "expected": "deny·device_not_registered"
+  },
+  {
+    "id": "T22",
+    "stage": 6,
+    "kind": "금지",
+    "request": "가상 판정기 — deviceRegistered 누락",
+    "expected": "deny·device_not_registered"
+  },
+  {
+    "id": "T23",
+    "stage": 7,
+    "kind": "정상",
+    "request": "가상 판정기 — 정상 접속 사건",
+    "expected": "allow"
+  },
+  {
+    "id": "T24",
+    "stage": 7,
+    "kind": "금지",
+    "request": "가상 판정기 — 정해진 복합 이상 사건",
+    "expected": "step_up·step_up_required; 실제 재로그인 집행과 구분"
+  },
+  {
+    "id": "T25",
+    "stage": 7,
+    "kind": "금지",
+    "request": "가상 판정기 — 위조 클라이언트 위치/헤더",
+    "expected": "신뢰 신호로 승격하지 않음"
+  },
+  {
+    "id": "T26",
+    "stage": 8,
+    "kind": "정상",
+    "request": "가상 판정기 — 계약의 정상 단건 메모 경로",
+    "expected": "allow; 전체 목록과 구분"
+  },
+  {
+    "id": "T27",
+    "stage": 8,
+    "kind": "금지",
+    "request": "가상 판정기 — GET /notes 전체 목록",
+    "expected": "deny·resource_zone"
+  },
+  {
+    "id": "T28",
+    "stage": 8,
+    "kind": "금지",
+    "request": "가상 판정기 — 공지 쓰기 요청",
+    "expected": "deny·resource_zone; 계약에 역할 없음"
+  },
+  {
+    "id": "T29",
+    "stage": 8,
+    "kind": "금지",
+    "request": "가상 판정기 — 알 수 없는 경로/기능 쿼리",
+    "expected": "deny"
+  },
+  {
+    "id": "T30",
+    "stage": 8,
+    "kind": "금지",
+    "request": "공지 API 쓰기 — 저장된 강사 권한 없는 학생",
+    "expected": "자료 없는 거부; 본문 role로 승격 불가"
+  },
+  {
+    "id": "T31",
+    "stage": 9,
+    "kind": "정상",
+    "request": "가상 탐지 — 정상 사건",
+    "expected": "observe, 회수 제안 없음"
+  },
+  {
+    "id": "T32",
+    "stage": 9,
+    "kind": "금지",
+    "request": "가상 탐지 — 계약의 복합 의심 사건",
+    "expected": "propose_revocation·대상·이유; 실제 회수 완료 아님"
+  },
+  {
+    "id": "T33",
+    "stage": 10,
+    "kind": "정상",
+    "request": "안전 정책 사본 읽기·미리보기",
+    "expected": "검증 후 버전·변경 범위 표시; 운영 정책 불변"
+  },
+  {
+    "id": "T34",
+    "stage": 10,
+    "kind": "금지",
+    "request": "정책 사본 없음/검증 실패",
+    "expected": "중단; 정책 변경 없음"
+  },
+  {
+    "id": "T35",
+    "stage": 10,
+    "kind": "정상",
+    "request": "POST /api/restore-notes/preview — B 시험 한 건",
+    "expected": "ID·사본·내용 해시·예정 변경 확인; 원문 기록 금지"
+  },
+  {
+    "id": "T36",
+    "stage": 10,
+    "kind": "정상",
+    "request": "POST /api/restore/notes/{B 시험 ID}",
+    "expected": "복원 후 ID·소유자·내용 해시 일치; 다른 메모·감사 보존"
+  },
+  {
+    "id": "T37",
+    "stage": 10,
+    "kind": "금지",
+    "request": "복원 요청 — 소유자/해시 불일치·미검증 사본",
+    "expected": "거부, 자료 변경 없음"
+  },
+  {
+    "id": "T38",
+    "stage": 11,
+    "kind": "금지",
+    "request": "GET /api/notes — 로그인·미승인 브라우저",
+    "expected": "403 DEVICE_NOT_APPROVED, 자료 없음"
+  },
+  {
+    "id": "T39",
+    "stage": 11,
+    "kind": "금지",
+    "request": "POST /api/device — 승인 요청만 수행",
+    "expected": "pending; 메모 영역 닫힘, 권한 부여 없음"
+  },
+  {
+    "id": "T40",
+    "stage": 11,
+    "kind": "정상",
+    "request": "운영자 승인 후 GET /api/device 및 본인 메모 CRUD",
+    "expected": "서버 approved 확인 뒤 기존 기능 정상"
+  },
+  {
+    "id": "T41",
+    "stage": 11,
+    "kind": "금지",
+    "request": "운영자 승인 취소 후 다음 보호 요청",
+    "expected": "403, 보호 화면 닫힘"
+  }
+]

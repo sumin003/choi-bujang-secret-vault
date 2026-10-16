@@ -1,3 +1,4 @@
+import {runOperationsChecks} from '../src/operations-checks.mjs';
 import { randomUUID } from 'node:crypto';
 import { enforceApprovedDevice } from '../src/device-approval.mjs';
 import { RULE_IDS } from '../src/decider.mjs';
@@ -8,7 +9,7 @@ import web from '../xdr/web-injection/result.json' with { type: 'json' };
 import cve from '../xdr/known-cve/result.json' with { type: 'json' };
 
 export function createOperationsHandler({ verify, approve = enforceApprovedDevice,
-  writeRecord = record => console.log(JSON.stringify(record)) } = {}) {
+  runChecks = runOperationsChecks, writeRecord = record => console.log(JSON.stringify(record)) } = {}) {
   let verifier;
   return async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -35,6 +36,7 @@ export function createOperationsHandler({ verify, approve = enforceApprovedDevic
       // Explicit allowlist only: never return decisions, events, notes or identities.
       const summary = {
         schema:'aleph.operations.summary.v1', requestId:randomUUID(), checkedAt:new Date().toISOString(),
+        verification:await runChecks({publicAppUrl:config.publicAppUrl}),
         access:{status:'confirmed', source:'server_login_and_device_approval'},
         rules:{status:'configuration_loaded', ids:[...RULE_IDS], execution:'not_run'},
         detection:{status:'not_run', source:'no_live_event_query', savedFixtureResults:
