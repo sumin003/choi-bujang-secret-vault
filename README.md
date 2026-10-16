@@ -228,6 +228,18 @@ src/decider.mjs의 device_registered 규칙은 엔진이 전달한 request.devic
 
 2026-10-13 위 명령을 실제 실행해 두 항목 통과를 확인했고, 판정기를 직접 호출해 등록 요청 allow·approved와 미등록 요청 deny·device_not_registered를 대조했습니다. 이는 로컬 가상 요청 연습이며 실제 접속이나 심판 통과 증거가 아닙니다. 실제 미등록 기기 공격의 확인은 심판이 맡습니다. 설정의 step을 6으로 변경했고 기존 자료실 주소·브라우저 화면·로그인 발급자·허용 경로·원본 API 주소·judgeIssuer는 유지합니다. 제출 묶음의 직접 HTTP 점검은 실행 결과만 기록하며 접근 제한이나 통신 오류는 미확인으로 남깁니다. 브라우저에서 기기 상태를 위조하거나 실제 공격을 수행하는 절차는 포함하지 않습니다.
 
+## 보너스 xdr-06 저장점
+
+2026-10-16 `npm run xdr:run -- exfiltration`를 다시 실행해 `xdr/exfiltration/result.json`을 갱신했습니다. 경보 30건의 counts는 block 10 · alert 10 · record 10이며 정상 이벤트 10건 중 block은 0건입니다.
+
+읽기 모듈은 시각·출발 주소·계정·규칙 수준·설명만 추출하고 비밀값처럼 보이는 값은 가립니다. 원본 30건과 출력 30줄이 일치합니다. patterns.json에는 T1041·T1048 및 압축 준비의 T1560.001 근거를 패턴마다 한 줄씩 기록했습니다. 독립형 decide.mjs는 패턴을 상수로 복사하며 import·파일 입출력·외부 호출 없이 판단합니다. 낯선 목적지·시간·전송량 하나만으로 차단하지 않습니다.
+
+respond.mjs는 명확한 후보만 근거 경보 번호와 15분 만료 시각이 있는 IP 거부 규칙으로 저장하고 정제한 알림을 xdr/alerts.log에 한 줄씩 추가합니다. 공유 주소의 정상 이벤트를 보호하며 createConnectedDecider로 기존 판정기에 거부 검사만 더합니다. 원본 경보·기존 판정기 규칙·자료실 기능은 보존했습니다.
+
+임시 경로와 경보 시각을 사용한 로컬 연결 시험 5건 통과: 명확한 공격 10건 거부, 애매한 시도 10건 알림 및 통과, 정상 10건 통과를 확인했습니다. 만료 해제·공유 주소 보호·기존 거부와 추가 확인 유지·민감한 입력의 로그 제외도 확인했습니다. 이 기록은 가상 경보 재생 결과입니다.
+
+다시 실행: `npm run xdr:run -- exfiltration`. 연결 확인: `node --test test/xdr-exfiltration-respond.test.mjs`.
+
 ## 보너스 xdr-05 저장점
 
 2026-10-16 `npm run xdr:run -- privilege`를 다시 실행해 `xdr/privilege/result.json`을 갱신했습니다. 경보 26건의 counts는 block 9 · alert 8 · record 9이며 정상 이벤트 9건 중 block은 0건입니다.
