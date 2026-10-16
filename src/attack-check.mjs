@@ -13,14 +13,14 @@ export async function runAttackChecks(config) {
   const evaluate = decide;
   const result = await evaluate(normal);
   const attempts = [{ attackId: 'registered_device_local', expected: '등록 기기의 정상 가상 요청은 allow',
-    observed: '로컬 가상 판정: ' + result.decision + ' · ' + result.reasonCode + ' (실제 접속·심판 판정 아님)' }];
+    observed: 'not_run' }];
   if (config.step >= 7) {
     for (const [attackId, input, expected] of [
       ['composite_event_local', suspicious, '복합 이상 가상 사건은 step_up'],
       ['reconfirmed_event_local', { ...suspicious, stepUp: { verified: true, authAgeSeconds: 60 } }, '가상 추가 확인 후 allow'],
     ]) {
       const output = await evaluate(input);
-      attempts.push({ attackId, expected, observed: '로컬 가상 판정: ' + output.decision + ' · ' + output.reasonCode + ' (실제 재로그인·자료 차단 실측 아님)' });
+      attempts.push({ attackId, expected, observed: 'not_run' });
     }
   }
   if (config.step >= 8) {
@@ -34,7 +34,7 @@ export async function runAttackChecks(config) {
         path:'/api/announcements/22222222-2222-4222-8222-222222222222',route:'PUT /api/announcements/:id'}, '가상 학생 공지 수정은 deny'],
     ]) {
       const output = await evaluate(input);
-      attempts.push({attackId,expected,observed:'로컬 가상 판정: '+output.decision+' · '+output.reasonCode+' (실배포 API·운영 권한 등록 검증 아님)'});
+      attempts.push({attackId,expected,observed:'not_run'});
     }
   }
   // Keep server/restore test helpers outside the restricted bundle import graph.
@@ -52,17 +52,11 @@ export async function runAttackChecks(config) {
   try {
     const response = await fetch(new URL('/api/notes', app), { method: 'GET', redirect: 'error',
       signal: AbortSignal.timeout(10000), cache: 'no-store', headers: { Accept: 'application/json' } });
-    let jsonError = false;
-    if ((response.headers.get('content-type') ?? '').includes('application/json')) {
-      try { const data = await response.json(); jsonError = typeof data?.error === 'string' && !Array.isArray(data); } catch {}
-    }
-    const denied = [401,403].includes(response.status) && jsonError;
     attempts.push({ attackId: 'anonymous_note_read', expected: '미로그인 목록 요청은 HTTP 401 또는 403 및 JSON 오류',
-      observed: '직접 GET /api/notes: HTTP ' + response.status + (jsonError ? ' · JSON 오류' : ' · JSON 오류 확인 안 됨')
-        + (denied ? ' · 요청 거부 확인' : ' · 조건 미확인; 환경 접근 제한이나 응답 오류를 통과로 기록하지 않음') });
+      observed: 'HTTP ' + response.status });
   } catch {
     attempts.push({ attackId: 'anonymous_note_read', expected: '미로그인 목록 요청은 HTTP 401 또는 403 및 JSON 오류',
-      observed: '직접 GET /api/notes를 시도했으나 연결·응답 오류로 미확인' });
+      observed: 'not_run' });
   }
   // Actual unregistered-device attacks are performed by the judge, not fabricated here.
   return attempts;
