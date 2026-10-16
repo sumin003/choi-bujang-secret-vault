@@ -1,10 +1,5 @@
 import { fixtureRequests } from '../scripts/fixture-7.mjs';
 import { decide } from './decider.mjs';
-import { detect } from './detect.mjs';
-import { checkDetection } from '../scripts/detect-test.mjs';
-import { checkDetection as checkDeviceDetection } from '../scripts/detect-device-test.mjs';
-import { runRestoreAccessChecks } from '../scripts/restore-access-check.mjs';
-import { enforceApprovedDevice } from './device-approval.mjs';
 
 // Record only what was actually requested/returned, never keys, tokens or response bodies.
 export async function runAttackChecks(config) {
@@ -12,7 +7,7 @@ export async function runAttackChecks(config) {
   if (!Number.isInteger(config.step) || config.step < 6 || config.step > 12)
     throw new Error('이 단계의 자기 점검을 구현해 주세요.');
   const app = new URL(config.publicAppUrl);
-  if (app.protocol !== 'https:' || app.username || app.password || app.search || app.hash || app.pathname !== '/')
+  if (app.protocol !== 'https:' || app.username || app.password || app.search || app.hash || app.pathname !== '/' || app.port || !app.hostname.endsWith('.vercel.app'))
     throw new Error('자료실의 HTTPS 배포 주소를 확인해 주세요.');
   const { normal, suspicious } = fixtureRequests();
   const evaluate = decide;
@@ -42,44 +37,20 @@ export async function runAttackChecks(config) {
       attempts.push({attackId,expected,observed:'로컬 가상 판정: '+output.decision+' · '+output.reasonCode+' (실배포 API·운영 권한 등록 검증 아님)'});
     }
   }
-  if (config.step >= 9) {
-    const checks = await checkDetection(detect);
-    const passed = checks.filter(item => item.passed).length;
-    const deviceChecks = await checkDeviceDetection(detect);
-    const devicesPassed = deviceChecks.filter(item => item.passed).length;
-    attempts.push({attackId:'detection_proposal_local',
-      expected:'제공 원본 계약의 대상 선택자·이유가 있는 회수 제안과 정상 유지; 확장 입력은 확인 기기 한 개만 제안',
-      observed:'제공 원본 연습 '+passed+'/'+checks.length+' · 확장 기기 연습 '+devicesPassed+'/'+deviceChecks.length+' 통과 (실제 회수·경과 시간·심판 판정 아님)'});
-  }
+  // Keep server/restore test helpers outside the restricted bundle import graph.
+  // They remain available through their existing, separate local test commands.
+  if (config.step >= 9) attempts.push({attackId:'detection_proposal_local',
+    expected:'별도 탐지 시험에서 정상 유지와 복합 의심 회수 제안 확인', observed:'not_run'});
   if (config.step >= 10) {
-    const checks = await runRestoreAccessChecks();
-    if (!checks.data.aOwnAllowed || !checks.data.bToADenied || !checks.data.bOwnRestoredReadable
-      || !checks.policy.aOwnAllowed || !checks.policy.bToADenied || !checks.policy.itemsRestored) {
-      throw new Error('복구 뒤 정상·금지 자료 요청 확인에 실패했습니다.');
-    }
     attempts.push({attackId:'restored_note_access_local',
-      expected:'가상 B 메모 복원 뒤 A 본인 조회 허용·B의 A 자료 거부·B 복원 자료 조회 허용',
-      observed:'격리된 합성 사본으로 복원한 뒤 API 확인 통과: A 본인 200 · B→A 404 거부 · B 본인 200 (실제 백업·배포 시험 아님)'});
+      expected:'복원 뒤 본인 자료 허용과 타인 자료 거부 확인', observed:'not_run'});
     attempts.push({attackId:'restored_policy_access_local',
-      expected:'시험 정책 복원 뒤 A의 GET/PUT/DELETE 허용·B의 A 메모 GET/PUT/DELETE 거부',
-      observed:'격리 시험 정책 복원 뒤 판정기 재호출 통과: A 요청 allow · B 요청 deny/resource_zone (실제 운영 정책 아님)'});
+      expected:'정책 복원 뒤 정상·금지 요청 재시험', observed:'not_run'});
   }
-  if (config.step >= 11) {
-    const response = { statusCode: 200, body: null,
-      setHeader() {},
-      status(code) { this.statusCode = code; return this; },
-      json(body) { this.body = body; return this; } };
-    const allowed = await enforceApprovedDevice({ headers: {} }, response,
-      { kind: 'student', userId: '00000000-0000-4000-8000-000000000001' });
-    attempts.push({ attackId: 'unregistered_browser_local',
-      expected: '브라우저 등록 쿠키가 없으면 자료 없이 JSON 403으로 거부',
-      observed: allowed === false && response.statusCode === 403
-        && response.body?.error === 'DEVICE_NOT_APPROVED'
-        ? '로컬 서버 검사: 등록 쿠키 없는 요청 JSON 403 거부 (실제 배포 승인 시험 아님)'
-        : '로컬 서버 검사에서 미등록 브라우저 거부를 확인하지 못함' });
-  }
+  if (config.step >= 11) attempts.push({attackId:'unregistered_browser_local',
+    expected:'별도 서버 시험에서 미등록 브라우저 자료 접근 거부', observed:'not_run'});
   try {
-    const response = await fetch(new URL('/api/notes', app), { redirect: 'error',
+    const response = await fetch(new URL('/api/notes', app), { method: 'GET', redirect: 'error',
       signal: AbortSignal.timeout(10000), cache: 'no-store', headers: { Accept: 'application/json' } });
     let jsonError = false;
     if ((response.headers.get('content-type') ?? '').includes('application/json')) {
@@ -113,7 +84,7 @@ async function legacyStageOne(config) {
   }
   if (typeof config.sampleMarker !== 'string' || !config.sampleMarker) throw new Error('가상 메모의 확인 표시를 넣어 주세요.');
   const response = await fetch(new URL('/data.json', app), {
-    redirect: 'error', signal: AbortSignal.timeout(10000),
+    method: 'GET', redirect: 'error', signal: AbortSignal.timeout(10000),
   });
   let visible = false;
   if (response.ok) {
