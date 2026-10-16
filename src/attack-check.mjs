@@ -9,7 +9,7 @@ import { enforceApprovedDevice } from './device-approval.mjs';
 // Record only what was actually requested/returned, never keys, tokens or response bodies.
 export async function runAttackChecks(config) {
   if (config.step === 1) return legacyStageOne(config);
-  if (!Number.isInteger(config.step) || config.step < 6 || config.step > 11)
+  if (!Number.isInteger(config.step) || config.step < 6 || config.step > 12)
     throw new Error('이 단계의 자기 점검을 구현해 주세요.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.search || app.hash || app.pathname !== '/')

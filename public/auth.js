@@ -12,6 +12,10 @@ const deviceMessage = document.querySelector('#device-message');
 const requestDevice = document.querySelector('#request-device');
 const checkDeviceButton = document.querySelector('#check-device');
 const vault = document.querySelector('#protected-vault');
+const operationsStatus = document.querySelector('#operations-status');
+const operationsSummary = document.querySelector('#operations-summary');
+const operationsRefresh = document.querySelector('#refresh-operations');
+let operationsVersion = 0;
 let deviceVersion = 0;
 let deviceApproved = false;
 let deviceBusy = false;
@@ -35,6 +39,9 @@ let editingId = null;
 let writing = false;
 
 function lockVault(label = '기기 승인 상태: 미확인. 로그인 후 서버에서 확인합니다.') {
+  ++operationsVersion;
+  operationsStatus.textContent = '미실행';
+  operationsSummary.replaceChildren();
   ++deviceVersion;
   ++notesVersion;
   deviceApproved = false;
@@ -46,6 +53,49 @@ function lockVault(label = '기기 승인 상태: 미확인. 로그인 후 서�
   list.replaceChildren(item);
   deviceStatus.textContent = label;
 }
+
+async function loadOperations(session) {
+  const version = ++operationsVersion;
+  operationsSummary.replaceChildren();
+  operationsStatus.textContent = '확인 중';
+  try {
+    if (!deviceApproved || !session?.access_token) throw new Error();
+    const response = await fetch('/api/operations', {headers:{Authorization:'Bearer ' + session.access_token},
+      credentials:'same-origin', cache:'no-store'});
+    if (version !== operationsVersion || session !== currentSession || !deviceApproved) return;
+    if (!response.ok) {
+      operationsStatus.textContent = '확인 실패 · HTTP ' + response.status + ' · 실행 결과 미확인';
+      if (response.status === 401) render(null);
+      if (response.status === 403) lockVault('기기 승인 상태: 다시 확인이 필요합니다.');
+      return;
+    }
+    const data = await response.json();
+    if (version !== operationsVersion || session !== currentSession || !deviceApproved) return;
+    if (data.schema !== 'aleph.operations.summary.v1'
+      || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(data.requestId)) throw new Error();
+    const lines = [
+      '접근 확인: 서버 로그인·기기 승인 확인됨. 규칙 시험 통과를 뜻하지 않습니다.',
+      '판정기 규칙: ' + data.rules.ids.join(', ') + ' · 설정 조회 확인 / 이번 규칙 시험 미실행',
+      '탐지 사건: 실제 사건 조회 미실행',
+      ...data.detection.savedFixtureResults.map(item => '저장된 시험 경보 ' + item.moduleKey
+        + ': block ' + item.counts.block + ' / alert ' + item.counts.alert + ' / record ' + item.counts.record
+        + ' · 이 화면에서 재시험하지 않음'),
+      '회수 상태: 미실행 · 회수 제안과 실제 권한 회수는 별개입니다.',
+      '복구 기준 버전: ' + data.recovery.candidateVersion
+        + ' · 사본 검증·실제 복원 미실행',
+    ];
+    operationsSummary.replaceChildren(...lines.map(text => {
+      const li = document.createElement('li'); li.textContent = text; return li;
+    }));
+    operationsStatus.textContent = 'GET /api/operations · HTTP 200 · 요청 ID ' + data.requestId + ' · 조회 시각 ' + data.checkedAt;
+  } catch {
+    if (version === operationsVersion && session === currentSession) {
+      operationsSummary.replaceChildren();
+      operationsStatus.textContent = '확인 실패 · 실행 결과 미확인';
+    }
+  }
+}
+operationsRefresh.addEventListener('click', () => void loadOperations(currentSession));
 
 async function deviceFetch(body) {
   const session = currentSession;
@@ -78,6 +128,7 @@ async function refreshDeviceStatus(session) {
       vault.hidden = false;
       editor.hidden = false;
       void loadNotes(session);
+      void loadOperations(session);
     } else {
       lockVault(result.status === 'pending' ? '기기 승인 상태: 승인 대기 중.'
         : result.status === 'rejected' ? '기기 승인 상태: 거부됨.'

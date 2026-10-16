@@ -23,6 +23,12 @@ test('screen requests pending, checks approval and clears protected data on logo
       if (init.method === 'POST') { assert.deepEqual(JSON.parse(init.body), { action: 'request' }); requests++; status = 'pending'; }
       return { ok: true, json: async () => ({ status, requestId: '11111111-1111-4111-8111-111111111111' }) };
     }
+    if (path === '/api/operations') {
+      assert.equal(status, 'approved');
+      return {ok:true,status:200,json:async()=>({schema:'aleph.operations.summary.v1',requestId:'11111111-1111-4111-8111-111111111111',checkedAt:'2026-10-16T00:00:00.000Z',
+        rules:{ids:['device_registered']},detection:{savedFixtureResults:[]},
+        recovery:{candidateVersion:'a'.repeat(40)}})};
+    }
     assert.equal(path, '/api/notes'); assert.equal(status, 'approved'); reads++;
     return { ok: true, status: 200, json: async () => [{ id: NOTE, title: 'fixture title', body: 'fixture body' }] };
   };
@@ -54,7 +60,14 @@ test('screen requests pending, checks approval and clears protected data on logo
   assert.match(elements.get('#device-message').textContent,/요청 번호: 11111111-1111-4111-8111-111111111111/);
   status = 'approved'; await elements.get('#check-device').listeners.get('click')(); await flush(); await flush();
   assert.equal(vault.hidden, false); assert.equal(reads, 1); assert.equal(list.children[0].children[0].textContent, 'fixture title');
+  const summary = elements.get('#operations-summary');
+  assert.ok(summary.children.some(item => item.textContent.includes('회수 상태: 미실행')));
+  assert.ok(summary.children.some(item => item.textContent.includes('규칙 시험 미실행')));
+  assert.ok(summary.children.every(item => !item.textContent.includes('fixture body')));
+  assert.match(elements.get('#operations-status').textContent,/HTTP 200/);
+  assert.match(elements.get('#operations-status').textContent,/요청 ID 11111111-1111-4111-8111-111111111111/);
   context.navigator.onLine = false; windowEvents.get('offline')();
+  assert.equal(summary.children.length,0);
   assert.equal(vault.hidden,true); assert.equal(reads,1);
   assert.match(elements.get('#connection-status').textContent,/오프라인에서는 볼 수 없습니다/);
   context.navigator.onLine = true; windowEvents.get('online')();
