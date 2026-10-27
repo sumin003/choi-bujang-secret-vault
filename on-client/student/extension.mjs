@@ -637,6 +637,84 @@ export function createStudentView() {
       line('AI 설명이나 제안만으로 보안 조치가 실행되지는 않습니다.');
       return root;
     },
-    renderAction() { return '학생 구현 대기: 현재 사건·조치·실제 대상·사람 확인·ACK와 원천 효과·unknown을 구분하세요.'; },
+    renderAction({ status, event, actionId, target, receipt, observation, message, confirmationExpiresAt, error }) {
+      const root = document.createElement('div');
+      const line = (text) => {
+        const p = document.createElement('p');
+        p.textContent = text;
+        root.appendChild(p);
+      };
+      const present = (value) => value !== null && value !== undefined && value !== '';
+      const field = (name, value) => {
+        if (present(value) && ['string', 'number', 'boolean'].includes(typeof value)) {
+          line(name + ': ' + String(value));
+        }
+      };
+      const labels = {
+        idle: '아직 미실행(idle)',
+        loading: '조치 준비 또는 결과 조회 중(loading) · 실행 결과 확인 전',
+        prepared: '준비됨·미실행(prepared)',
+        executing: '서버에 전달 중(executing) · 결과가 아직 확인되지 않았습니다.',
+        pending: '서버 접수·처리 중(pending) · 접수 응답(ACK)은 실제 효과 확인이 아닙니다.',
+        succeeded: '효과 확인(succeeded)',
+        denied: '연동 시스템 거절(denied)',
+        failed: '연동 시스템 실패(failed)',
+        unknown: '결과 불명(unknown)',
+        expired: '확인 기한 지남(expired)',
+        error: '요청 처리 안 됨(error)',
+      };
+      const known = Object.hasOwn(labels, status);
+      const confirmed = status === 'succeeded' && observation?.effectApplied === true;
+      const shownStatus = !known || status === 'succeeded' && !confirmed ? 'unknown' : status;
+      line(labels[shownStatus]);
+
+      if (present(event?.id)) root.setAttribute('data-student-action-event', event.id);
+      if (present(receipt?.requestId)) root.setAttribute('data-student-action-request', receipt.requestId);
+      field('사건 ID(event.id)', event?.id);
+      if (Array.isArray(event?.evidence)) {
+        for (const entry of event.evidence) field('근거 ID', entry.id);
+      }
+      field('조치 ID(actionId)', actionId);
+      field('실제 대상 ID(target.id)', target?.id);
+      field('대상 세대(target.generation)', target?.generation);
+      field('요청 ID(requestId)', receipt?.requestId);
+      field('영수증 ID(receiptId)', receipt?.receiptId);
+      field('결과 버전(version)', receipt?.version);
+
+      if (shownStatus === 'idle') {
+        line('AI 제안만으로 조치는 실행되지 않습니다.');
+        if (Array.isArray(event?.supportedActions) && event.supportedActions.length === 0) {
+          line('현재 기록에는 지원 조치가 없어 조치 준비 버튼이 표시되지 않는 것이 정상입니다.');
+        } else if (!event) {
+          line('현재 기록의 지원 조치가 비어 있으면 조치 준비 버튼이 표시되지 않는 것이 정상입니다.');
+        }
+      } else if (shownStatus === 'prepared') {
+        field('사람 확인 기한(confirmationExpiresAt)', confirmationExpiresAt);
+        line('실제 대상과 조치를 사람이 확인하기 전에는 실행되지 않습니다. 제공 화면에서 대상과 조치를 확인하세요.');
+      } else if (shownStatus === 'executing' || shownStatus === 'pending') {
+        line('실제 효과는 아직 확인되지 않았습니다. 중복 집행을 요청하지 마세요.');
+      } else if (confirmed) {
+        field('관측 시각(observation.observedAt)', observation.observedAt);
+        line('effectApplied: true');
+      } else if (shownStatus === 'unknown') {
+        line('성공이나 효과 없음으로 판단하지 마세요. 제공 화면의 연동 시스템 결과만 재조회 버튼을 직접 누르세요.');
+        line('같은 조치를 다시 집행하지 말고 기존 요청의 결과만 확인하세요.');
+      } else if (shownStatus === 'expired') {
+        line('이번 확인 기한으로는 집행할 수 없습니다. 제공 화면에서 조치를 다시 준비하고 실제 대상을 확인하세요.');
+      }
+
+      if (['idle', 'loading', 'denied', 'failed', 'unknown', 'expired', 'error'].includes(shownStatus)) {
+        field('안내', message);
+      }
+      if (error && ['error', 'unknown', 'expired', 'denied', 'failed'].includes(shownStatus)) {
+        field('오류 코드', error.code);
+        field('오류 내용', error.message);
+      }
+      if (receipt?.replayed === true) line('기존 요청의 응답 재전달(replayed)입니다. 새 집행을 의미하지 않습니다.');
+      if (receipt?.superseded === true) line('이전 결과가 대체됐습니다(superseded). 기존 결과를 현재 효과로 판단하지 마세요.');
+      line('조치 준비·사람 확인·결과 재조회는 제공 화면 버튼을 사용하세요. 이 학생 영역은 요청을 전송하지 않습니다.');
+      line('조치 화면 취소는 이미 서버에 전달된 조치 효과를 되돌리지 않습니다.');
+      return root;
+    },
   };
 }
