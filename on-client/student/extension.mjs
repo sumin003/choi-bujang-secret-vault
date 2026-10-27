@@ -460,7 +460,9 @@ export function createStudentView() {
         "SUBJECT_SCOPE_UNVERIFIED": "현재 로그인과 사건·프로젝트의 연결을 확인할 수 없습니다.",
         "ON_AI_INVALID_INPUT": "설명에 필요한 사건 근거·규칙을 확인할 수 없습니다.",
         "ON_AI_INVALID_OUTPUT": "AI 설명의 근거·조치·응답 형식을 확인할 수 없습니다.",
-        "AI_REQUEST_UNVERIFIED": "AI 연결 또는 응답을 확인할 수 없습니다. 기존 기록을 확인하세요."
+        "AI_REQUEST_UNVERIFIED": "AI 연결 또는 응답을 확인할 수 없습니다. 담당자에게 계정 연결과 앱 권한 확인을 요청하세요.",
+        "WB_CLCO_NETWORK_ERROR": "AI 게이트와의 네트워크 연결을 확인할 수 없습니다. 잠시 뒤 직접 다시 점검하세요.",
+        "WB_CLCO_SERVER_UNAVAILABLE": "AI 게이트 서버를 이용할 수 없습니다. 잠시 뒤 직접 다시 점검하세요."
 };
       const showError = (error) => {
         const code = Object.hasOwn(messages, error?.code) ? error.code : 'AI_REQUEST_UNVERIFIED';
@@ -524,7 +526,9 @@ export function createStudentView() {
         "SUBJECT_SCOPE_UNVERIFIED": "현재 로그인과 사건·프로젝트의 연결을 확인할 수 없습니다.",
         "ON_AI_INVALID_INPUT": "설명에 필요한 사건 근거·규칙을 확인할 수 없습니다.",
         "ON_AI_INVALID_OUTPUT": "AI 설명의 근거·조치·응답 형식을 확인할 수 없습니다.",
-        "AI_REQUEST_UNVERIFIED": "AI 연결 또는 응답을 확인할 수 없습니다. 기존 기록을 확인하세요."
+        "AI_REQUEST_UNVERIFIED": "AI 연결 또는 응답을 확인할 수 없습니다. 담당자에게 계정 연결과 앱 권한 확인을 요청하세요.",
+        "WB_CLCO_NETWORK_ERROR": "AI 게이트와의 네트워크 연결을 확인할 수 없습니다. 잠시 뒤 직접 다시 점검하세요.",
+        "WB_CLCO_SERVER_UNAVAILABLE": "AI 게이트 서버를 이용할 수 없습니다. 잠시 뒤 직접 다시 점검하세요."
 };
       const showError = (error) => {
         const code = Object.hasOwn(messages, error?.code) ? error.code : 'AI_REQUEST_UNVERIFIED';
