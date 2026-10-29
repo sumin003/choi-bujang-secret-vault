@@ -1,6 +1,102 @@
 // 이 파일은 학생이 같은 프로젝트에서 이어서 구현합니다.
 // 제공 UI를 받은 것만으로 단계 완료를 인정하지 않습니다.
-export function createStudentView() {
+export function createStudentView({ api } = {}) {
+  // 제공된 읽기 전용 측정 API를 재사용한다. OS 조회·자동 재요청·예시 값 없음.
+  let pc = { status: 'idle' };
+  const pcPanel = () => {
+    const root = document.createElement('section');
+    const add = (parent, tag, text) => {
+      const node = document.createElement(tag);
+      node.textContent = text;
+      parent.appendChild(node);
+      return node;
+    };
+    const reasons = {
+      permission_denied: '일반 권한으로 읽을 수 없습니다',
+      unsupported: '이 운영체제에서 지원하지 않습니다',
+      timeout: '조회 시간이 초과됐습니다',
+      query_failed: '시스템 조회에 실패했습니다',
+      invalid_response: '응답 형식을 확인할 수 없습니다',
+      invalid_sample: '유효한 CPU 측정 구간을 확보하지 못했습니다',
+      cancelled: '측정이 취소됐습니다',
+    };
+    const finite = n => typeof n === 'number' && Number.isFinite(n) && n >= 0;
+    const gib = n => (n / 1024 ** 3).toFixed(2) + ' GiB';
+    const paint = () => {
+      root.replaceChildren();
+      add(root, 'h3', '케셰브 · 내 PC 실측');
+      add(root, 'p', '제공된 로컬 PC 측정 기능을 사용합니다. 예시 값은 표시하지 않습니다. 보안 서버·AI 연결 상태와 별개입니다.');
+      const button = add(root, 'button', pc.status === 'loading' ? 'PC 상태 측정 중' : 'PC 상태 새로 측정');
+      button.type = 'button';
+      button.disabled = pc.status === 'loading' || typeof api?.get !== 'function';
+      button.addEventListener('click', async () => {
+        if (pc.status === 'loading') return;
+        pc = { status: 'loading' };
+        paint();
+        try {
+          const reply = await api.get('/api/pc/status');
+          const data = reply?.data;
+          const stamp = typeof data?.measuredAt === 'string' ? Date.parse(data.measuredAt) : NaN;
+          if (!reply?.ok) pc = { status: 'error', reason: '로컬 앱 서버의 PC 측정 요청에 실패했습니다' };
+          else if (data?.schema !== 'aleph.on.pc-status.v1' || data.source !== 'local-pc'
+            || !data.metrics || !Number.isFinite(stamp) || Math.abs(Date.now() - stamp) > 60000) {
+            pc = { status: 'error', reason: '실측 출처·측정 시각·응답 형식을 확인할 수 없습니다' };
+          } else pc = { status: 'ok', data };
+        } catch {
+          pc = { status: 'error', reason: '로컬 앱 서버에 연결하거나 측정 결과를 읽을 수 없습니다' };
+        }
+        paint();
+        root.querySelector('button')?.focus();
+      });
+      const grid = document.createElement('div');
+      grid.style.display = 'grid';
+      grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(180px, 1fr))';
+      grid.style.gap = '12px';
+      root.appendChild(grid);
+      const d = pc.status === 'ok' ? pc.data : null;
+      const measured = d ? new Date(d.measuredAt).toLocaleString('ko-KR', {
+        timeZone: 'Asia/Seoul', hour12: false
+      }) + ' (한국 시각) · ' + d.measuredAt : null;
+      const card = (name, metric, describe) => {
+        const box = document.createElement('section');
+        box.style.border = '1px solid currentColor';
+        box.style.borderRadius = '12px';
+        box.style.padding = '12px';
+        grid.appendChild(box);
+        add(box, 'h4', name);
+        let text;
+        if (pc.status === 'idle') text = '확인 불가 — 아직 측정하지 않았습니다';
+        else if (pc.status === 'loading') text = '측정 중 — 이전 값을 현재 값으로 표시하지 않습니다';
+        else if (pc.status === 'error') text = '확인 불가 — ' + pc.reason;
+        else if (metric?.state !== 'ok') text = '확인 불가 — ' + (reasons[metric?.reason] || '읽을 수 있는 측정 결과가 없습니다');
+        else text = describe(metric) || '확인 불가 — 측정 값의 형식 또는 범위가 올바르지 않습니다';
+        add(box, 'p', text);
+        add(box, 'p', measured ? '측정 묶음 시각: ' + measured : '측정 시각: 확인 불가 — 유효한 실측 결과 없음');
+      };
+      card('CPU 사용률', d?.metrics.cpu, m =>
+        finite(m.usagePercent) && m.usagePercent <= 100
+          ? m.usagePercent.toFixed(1) + ' %' + (finite(m.sampleMs) ? ' · 표본 구간 ' + m.sampleMs + ' ms' : '') : null);
+      card('메모리 사용량', d?.metrics.memory, m =>
+        finite(m.usedBytes) && finite(m.totalBytes) && m.totalBytes > 0 && m.usedBytes <= m.totalBytes
+          ? gib(m.usedBytes) + ' / 전체 ' + gib(m.totalBytes) + ' · ' + (100 * m.usedBytes / m.totalBytes).toFixed(1) + ' %' : null);
+      card('디스크 남은 공간', d?.metrics.disk, m =>
+        finite(m.freeBytes) && finite(m.totalBytes) && m.totalBytes > 0 && m.freeBytes <= m.totalBytes
+          ? gib(m.freeBytes) + ' / 전체 ' + gib(m.totalBytes) : null);
+      card('방화벽 프로필', d?.metrics.firewall, m =>
+        Array.isArray(m.profiles) && m.profiles.length === 3
+          && ['Domain', 'Private', 'Public'].every(name => m.profiles.some(p => p.name === name && typeof p.enabled === 'boolean'))
+          ? m.profiles.map(p => p.name + ': ' + (p.enabled ? '켜짐' : '꺼짐')).join(' · ') + ' · 단위: 해당 없음' : null);
+      add(root, 'h4', '측정 결과 읽는 법');
+      add(root, 'p', 'CPU는 짧은 표본 구간의 사용률입니다. 작업 관리자와 비교할 때 측정 시점과 집계 구간이 다르면 값이 다를 수 있습니다.');
+      add(root, 'p', '메모리는 이 PC 전체의 사용량이며 케셰브 앱만의 사용량이 아닙니다. GiB는 1,073,741,824바이트입니다.');
+      add(root, 'p', '디스크는 로컬 앱 서버의 프로젝트가 있는 파일시스템의 남은 공간입니다. 모든 드라이브의 합계가 아닙니다.');
+      add(root, 'p', '측정 묶음 시각은 제공 API가 전체 조회를 마친 시각입니다. 각 항목을 정확히 동시에 측정했다는 뜻은 아닙니다. 자동 재측정과 관리자 권한 요청은 하지 않습니다.');
+      if (typeof api?.get !== 'function') add(root, 'p', '확인 불가 — 제공 PC 조회 API가 연결되지 않았습니다.');
+    };
+    paint();
+    return root;
+  };
+
   return {
     renderIdentity({ me, devices, sessions }) {
       const root = document.createElement('div');
@@ -300,6 +396,7 @@ export function createStudentView() {
     },
     renderStatus({ devices, sessions, notifications, diagnostics, mode }) {
       const root = document.createElement('div');
+      root.appendChild(pcPanel());
       const line = (parent, text) => {
         const p = document.createElement('p');
         p.textContent = text;
