@@ -3,6 +3,8 @@
 export function createStudentView({ api } = {}) {
   // 제공된 읽기 전용 측정 API를 재사용한다. OS 조회·자동 재요청·예시 값 없음.
   let pc = { status: 'idle' };
+  // 이 탭에서 받은 실측만 최대 20회 보관. 영구 저장·자동 수집 없음.
+  const pcHistory = [];
   const pcPanel = (sdp) => {
     const root = document.createElement('section');
     const add = (parent, tag, text) => {
@@ -32,7 +34,7 @@ export function createStudentView({ api } = {}) {
       add(root, 'p', '제공된 로컬 PC 측정 기능을 사용합니다. 예시 값은 표시하지 않습니다. 보안 서버·AI 연결 상태와 별개입니다.');
       add(root, 'h4', '핵심 기능 3가지');
       const overview = document.createElement('ol');
-      add(overview, 'li', '내 PC 실측 — 아래 상태 카드 네 개에서 값·단위·측정 시각을 확인합니다.');
+      add(overview, 'li', '내 PC 실측 — 상태 카드 네 개와 그 아래 실제 CPU·메모리 추이·측정 기록을 확인합니다.');
       add(overview, 'li', '연결과 기록 — 아래 요약에서 네트워크·Windows 기록·SDP 상태를 구분합니다.');
       add(overview, 'li', '보안 기록 상세 — 제공 보안 기록 메뉴에서 기존 필터와 상세 버튼으로 근거·규칙을 확인합니다.');
       root.appendChild(overview);
@@ -69,6 +71,23 @@ export function createStudentView({ api } = {}) {
         } catch {
           pc = { status: 'error', reason: '로컬 앱 서버에 연결하거나 측정 결과를 읽을 수 없습니다' };
         }
+        const data = pc.status === 'ok' ? pc.data : null;
+        const metric = (key, valid, value) => {
+          const m = data?.metrics?.[key];
+          return m?.state === 'ok' && valid(m)
+            ? { value: value(m) }
+            : { value: null, reason: pc.status === 'error' ? pc.reason
+              : m?.state === 'unavailable' ? (reasons[m.reason] || '측정 결과를 읽을 수 없습니다')
+              : '측정 값의 형식 또는 범위를 확인할 수 없습니다' };
+        };
+        pcHistory.push({
+          measuredAt: data?.measuredAt || null,
+          receivedAt: new Date().toISOString(),
+          cpu: metric('cpu', m => finite(m.usagePercent) && m.usagePercent <= 100, m => m.usagePercent),
+          memory: metric('memory', m => finite(m.usedBytes) && finite(m.totalBytes)
+            && m.totalBytes > 0 && m.usedBytes <= m.totalBytes, m => m.usedBytes / 1024 ** 3),
+        });
+        if (pcHistory.length > 20) pcHistory.shift();
         paint();
       });
       buttonBound = true;
@@ -118,6 +137,96 @@ export function createStudentView({ api } = {}) {
         Array.isArray(m.profiles) && m.profiles.length === 3
           && ['Domain', 'Private', 'Public'].every(name => m.profiles.some(p => p.name === name && typeof p.enabled === 'boolean'))
           ? m.profiles.map(p => p.name + ': ' + (p.enabled ? '켜짐' : '꺼짐')).join(' · ') + ' · 단위: 해당 없음' : null);
+
+      const trends = document.createElement('section');
+      trends.style.marginTop = '20px';
+      root.appendChild(trends);
+      add(trends, 'h3', '실측 추이와 최근 측정 기록');
+      add(trends, 'p', '다시 조회로 받은 최근 20회만 이 탭 메모리에 보관합니다. 새로고침·탭 종료 시 초기화됩니다. 왼쪽이 이전, 오른쪽이 최근이며 간격은 시간 길이가 아닌 조회 순서입니다.');
+      if (pcHistory.length === 0) add(trends, 'p', '아직 측정 기록이 없습니다. 예시 값으로 그래프를 채우지 않습니다.');
+      const format = (entry, key) => entry[key].value === null
+        ? '확인 불가 — ' + entry[key].reason
+        : entry[key].value.toFixed(key === 'cpu' ? 1 : 2) + (key === 'cpu' ? ' %' : ' GiB');
+      const stamp = entry => entry.measuredAt ? '측정 묶음 시각: ' + entry.measuredAt
+        : '측정 시각: 확인 불가 · 요청 결과 수신 시각: ' + entry.receivedAt;
+      for (const [key, title, unit] of [['cpu', 'CPU 사용률', '%'], ['memory', '메모리 사용량', 'GiB']]) {
+        add(trends, 'h4', title + ' 추이 · 단위 ' + unit);
+        if (pcHistory.length > 0) {
+          const latest = pcHistory[pcHistory.length - 1];
+          const previous = pcHistory[pcHistory.length - 2];
+          let comparison = '비교할 이전 측정 없음';
+          if (previous) {
+            comparison = latest[key].value === null || previous[key].value === null
+              ? '직전 측정 비교: 확인 불가 — 현재 또는 직전 측정에 유효한 값이 없습니다.'
+              : '직전 측정 대비: ' + ((latest[key].value - previous[key].value) >= 0 ? '+' : '')
+                + (latest[key].value - previous[key].value).toFixed(key === 'cpu' ? 1 : 2)
+                + (key === 'cpu' ? ' %p' : ' GiB');
+          }
+          add(trends, 'p', comparison);
+          const graph = document.createElement('div');
+          graph.style.display = 'flex';
+          graph.style.alignItems = 'stretch';
+          graph.style.gap = '8px';
+          graph.style.overflowX = 'auto';
+          graph.style.padding = '8px';
+          graph.tabIndex = 0;
+          graph.setAttribute('role', 'group');
+          graph.setAttribute('aria-label', title + ' 조회 순서별 막대그래프. 같은 값과 시각은 아래 표에서도 확인할 수 있습니다.');
+          trends.appendChild(graph);
+          const scale = key === 'cpu' ? 100 : Math.max(1, ...pcHistory.map(e => e[key].value || 0));
+          add(trends, 'p', '세로 범위: 0~' + scale.toFixed(key === 'cpu' ? 0 : 2) + ' ' + unit
+            + (key === 'memory' ? ' · 보관된 값에 따라 범위가 바뀝니다.' : ''));
+          pcHistory.forEach((entry, index) => {
+            const column = document.createElement('div');
+            column.style.flex = '0 0 86px';
+            graph.appendChild(column);
+            add(column, 'p', String(index + 1) + '회 · ' + (entry[key].value === null ? '확인 불가' : format(entry, key)));
+            const track = document.createElement('div');
+            track.style.height = '100px';
+            track.style.display = 'flex';
+            track.style.alignItems = 'flex-end';
+            track.style.borderBottom = '1px solid currentColor';
+            column.appendChild(track);
+            if (entry[key].value !== null) {
+              const bar = document.createElement('div');
+              bar.style.height = (100 * entry[key].value / scale) + '%';
+              bar.style.width = '100%';
+              bar.style.backgroundColor = 'currentColor';
+              bar.setAttribute('aria-hidden', 'true');
+              track.appendChild(bar);
+            } else add(track, 'span', '—');
+            add(column, 'p', stamp(entry));
+          });
+        }
+      }
+      if (pcHistory.length) {
+        const wrap = document.createElement('div');
+        wrap.style.overflowX = 'auto';
+        wrap.tabIndex = 0;
+        wrap.setAttribute('role', 'region');
+        wrap.setAttribute('aria-label', '실측 기록 표. 가로로 스크롤할 수 있습니다.');
+        trends.appendChild(wrap);
+        const table = document.createElement('table');
+        wrap.appendChild(table);
+        add(table, 'caption', '최근 측정 기록 · 과거 값이며 현재 상태를 보장하지 않습니다');
+        const head = document.createElement('thead');
+        table.appendChild(head);
+        const headers = document.createElement('tr');
+        head.appendChild(headers);
+        for (const text of ['조회 순서', '측정 시각 또는 실패 수신 시각', 'CPU (%)', '메모리 (GiB)']) {
+          const th = add(headers, 'th', text);
+          th.setAttribute('scope', 'col');
+        }
+        const body = document.createElement('tbody');
+        table.appendChild(body);
+        pcHistory.forEach((entry, index) => {
+          const row = document.createElement('tr');
+          body.appendChild(row);
+          for (const text of [String(index + 1), stamp(entry), format(entry, 'cpu'), format(entry, 'memory')]) add(row, 'td', text);
+        });
+      }
+      add(trends, 'p', '실패 구간은 보간하거나 정상 값으로 바꾸지 않습니다. 수치 변화만으로 침해·공격 또는 안전 여부를 판단하지 않습니다.');
+
       const summary = document.createElement('section');
       summary.style.marginTop = '20px';
       summary.style.padding = '16px';
