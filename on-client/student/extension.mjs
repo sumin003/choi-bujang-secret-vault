@@ -3,7 +3,7 @@
 export function createStudentView({ api } = {}) {
   // 제공된 읽기 전용 측정 API를 재사용한다. OS 조회·자동 재요청·예시 값 없음.
   let pc = { status: 'idle' };
-  const pcPanel = () => {
+  const pcPanel = (sdp) => {
     const root = document.createElement('section');
     const add = (parent, tag, text) => {
       const node = document.createElement(tag);
@@ -24,10 +24,14 @@ export function createStudentView({ api } = {}) {
     const gib = n => (n / 1024 ** 3).toFixed(2) + ' GiB';
     const paint = () => {
       root.replaceChildren();
+      root.style.lineHeight = '1.6';
       add(root, 'h3', '케셰브 · 내 PC 실측');
       add(root, 'p', '제공된 로컬 PC 측정 기능을 사용합니다. 예시 값은 표시하지 않습니다. 보안 서버·AI 연결 상태와 별개입니다.');
       const button = add(root, 'button', pc.status === 'loading' ? 'PC 상태 측정 중' : 'PC 상태 새로 측정');
       button.type = 'button';
+      button.style.padding = '10px 16px';
+      button.style.marginBottom = '16px';
+      button.style.borderRadius = '8px';
       button.disabled = pc.status === 'loading' || typeof api?.get !== 'function';
       button.addEventListener('click', async () => {
         if (pc.status === 'loading') return;
@@ -63,7 +67,8 @@ export function createStudentView({ api } = {}) {
         box.style.borderRadius = '12px';
         box.style.padding = '12px';
         parent.appendChild(box);
-        add(box, 'h4', name);
+        const title = add(box, 'h4', name);
+        title.style.margin = '0 0 8px';
         let text;
         if (pc.status === 'idle') text = '확인 불가 — 아직 측정하지 않았습니다';
         else if (pc.status === 'loading') text = '측정 중 — 이전 값을 현재 값으로 표시하지 않습니다';
@@ -86,14 +91,40 @@ export function createStudentView({ api } = {}) {
         Array.isArray(m.profiles) && m.profiles.length === 3
           && ['Domain', 'Private', 'Public'].every(name => m.profiles.some(p => p.name === name && typeof p.enabled === 'boolean'))
           ? m.profiles.map(p => p.name + ': ' + (p.enabled ? '켜짐' : '꺼짐')).join(' · ') + ' · 단위: 해당 없음' : null);
-      add(root, 'h4', '네트워크 구성 · Windows 기록');
-      card('네트워크 구성', d?.metrics.network, m =>
+      const summary = document.createElement('section');
+      summary.style.marginTop = '20px';
+      summary.style.padding = '16px';
+      summary.style.border = '1px solid currentColor';
+      summary.style.borderRadius = '12px';
+      root.appendChild(summary);
+      add(summary, 'h3', '연결과 기록');
+      // 요약 행은 실측 출처·실패 이유를 유지하며 좁은 화면에서 줄바꿈한다.
+      const summaryRow = (name, metric, describe) => {
+        const holder = document.createElement('div');
+        summary.appendChild(holder);
+        card(name, metric, describe, holder);
+        const box = holder.children[0];
+        box.style.border = '0';
+        box.style.borderBottom = '1px solid currentColor';
+        box.style.borderRadius = '0';
+        box.style.display = 'flex';
+        box.style.flexWrap = 'wrap';
+        box.style.alignItems = 'baseline';
+        box.style.gap = '8px 16px';
+        box.children[0].style.flex = '1 1 160px';
+        box.children[1].style.flex = '2 1 260px';
+        box.children[1].style.fontWeight = '600';
+        box.children[2].style.flex = '1 0 100%';
+        box.children[2].style.fontSize = '0.85em';
+        box.children[2].style.margin = '0';
+      };
+      summaryRow('네트워크 구성', d?.metrics.network, m =>
         Number.isSafeInteger(m.interfaceCount) && m.interfaceCount >= 0
           && Number.isSafeInteger(m.ipv4Count) && m.ipv4Count >= 0
           ? '비내부 네트워크 인터페이스: ' + m.interfaceCount + ' 개 · IPv4 주소: ' + m.ipv4Count + ' 개'
-          : null, root);
-      add(root, 'p', '제공 API는 비내부 인터페이스와 IPv4 주소 개수만 전달합니다. 인터넷 접속 가능 여부·IP 주소·게이트웨이·DNS·연결 속도는 확인 불가 — 이 조회에는 해당 정보가 없습니다.');
-      card('최근 Windows 기록 · System·Application 합산', d?.metrics.events, m =>
+          : null);
+
+      summaryRow('Windows 경고·오류 · System·Application 합산', d?.metrics.events, m =>
         Number.isSafeInteger(m.warningCount) && m.warningCount >= 0
           && Number.isSafeInteger(m.errorCount) && m.errorCount >= 0
           && m.warningCount + m.errorCount <= 5000 && m.sampleLimit === 5000
@@ -102,14 +133,32 @@ export function createStudentView({ api } = {}) {
             + ' · 조회 끝: ' + d.measuredAt + ' · 최근 약 24시간 · 최대 ' + m.sampleLimit + ' 건'
             + (m.truncated ? ' · 생략 있음: 최신 5,000건의 집계이며 전체 건수가 아닙니다.'
               : ' · 생략 없음')
-          : null, root);
-      add(root, 'p', '이 건수는 침해나 공격 탐지 결과가 아닙니다. System·Application 경고·오류를 합산한 값이며 로그별 건수와 원문은 이 API에 없습니다.');
-      add(root, 'p', '방화벽은 위 카드의 프로필 켜짐·꺼짐만 읽습니다. 개별 허용·차단 규칙은 확인 불가 — 제공 API의 조회 범위 밖입니다. 권한이 부족해도 관리자 권한을 요청하거나 설정을 변경하지 않습니다.');
-      add(root, 'h4', '측정 결과 읽는 법');
-      add(root, 'p', 'CPU는 짧은 표본 구간의 사용률입니다. 작업 관리자와 비교할 때 측정 시점과 집계 구간이 다르면 값이 다를 수 있습니다.');
-      add(root, 'p', '메모리는 이 PC 전체의 사용량이며 케셰브 앱만의 사용량이 아닙니다. GiB는 1,073,741,824바이트입니다.');
-      add(root, 'p', '디스크는 로컬 앱 서버의 프로젝트가 있는 파일시스템의 남은 공간입니다. 모든 드라이브의 합계가 아닙니다.');
-      add(root, 'p', '측정 묶음 시각은 제공 API가 전체 조회를 마친 시각입니다. 각 항목을 정확히 동시에 측정했다는 뜻은 아닙니다. 자동 재측정과 관리자 권한 요청은 하지 않습니다.');
+          : null);
+      summaryRow('방화벽 설정 · 읽기 전용', d?.metrics.firewall, m =>
+        Array.isArray(m.profiles) && m.profiles.length === 3
+          && ['Domain', 'Private', 'Public'].every(name => m.profiles.some(p => p.name === name && typeof p.enabled === 'boolean'))
+          ? m.profiles.map(p => p.name + ': ' + (p.enabled ? '켜짐' : '꺼짐')).join(' · ') + ' · 단위: 해당 없음'
+          : null);
+      if (sdp) {
+        sdp.style.padding = '12px';
+        sdp.style.borderBottom = '1px solid currentColor';
+        summary.appendChild(sdp);
+      }
+      add(summary, 'p', 'PC 조회 결과와 SDP 서버 연결 상태는 별개입니다. SDP 재확인은 제공 화면 위쪽 다시 불러오기를 직접 누르세요.');
+      add(summary, 'p', '이 건수는 침해나 공격 탐지 결과가 아닙니다.');
+      const details = document.createElement('details');
+      const caption = document.createElement('summary');
+      caption.textContent = '조회 범위와 측정 설명';
+      details.appendChild(caption);
+      root.appendChild(details);
+      add(details, 'p', '제공 API는 비내부 인터페이스와 IPv4 주소 개수만 전달합니다. 인터넷 접속 가능 여부·IP 주소·게이트웨이·DNS·연결 속도는 확인 불가 — 이 조회에는 해당 정보가 없습니다.');
+      add(details, 'p', 'Windows 기록은 System·Application 합산이며 로그별 건수와 원문은 이 API에 없습니다.');
+      add(details, 'p', '방화벽은 위 카드의 프로필 켜짐·꺼짐만 읽습니다. 개별 허용·차단 규칙은 확인 불가 — 제공 API의 조회 범위 밖입니다. 권한이 부족해도 관리자 권한을 요청하거나 설정을 변경하지 않습니다.');
+      add(details, 'h4', '측정 결과 읽는 법');
+      add(details, 'p', 'CPU는 짧은 표본 구간의 사용률입니다. 작업 관리자와 비교할 때 측정 시점과 집계 구간이 다르면 값이 다를 수 있습니다.');
+      add(details, 'p', '메모리는 이 PC 전체의 사용량이며 케셰브 앱만의 사용량이 아닙니다. GiB는 1,073,741,824바이트입니다.');
+      add(details, 'p', '디스크는 로컬 앱 서버의 프로젝트가 있는 파일시스템의 남은 공간입니다. 모든 드라이브의 합계가 아닙니다.');
+      add(details, 'p', '측정 묶음 시각은 제공 API가 전체 조회를 마친 시각입니다. 각 항목을 정확히 동시에 측정했다는 뜻은 아닙니다. 자동 재측정과 관리자 권한 요청은 하지 않습니다.');
       if (typeof api?.get !== 'function') add(root, 'p', '확인 불가 — 제공 PC 조회 API가 연결되지 않았습니다.');
     };
     paint();
@@ -415,7 +464,6 @@ export function createStudentView({ api } = {}) {
     },
     renderStatus({ devices, sessions, notifications, diagnostics, mode }) {
       const root = document.createElement('div');
-      root.appendChild(pcPanel());
       // PC 조회 응답의 meta는 SDP 연결 근거로 사용하지 않는다.
       const sdp = document.createElement('section');
       const sdpTitle = document.createElement('h3');
@@ -436,7 +484,7 @@ export function createStudentView({ api } = {}) {
         sdpText.textContent = 'SDP 연결 확인 불가 — 현재 기기·세션 응답만으로 연결 여부를 확인할 수 없습니다. 통신 실패·인증 오류·응답 불일치를 미연결로 단정하지 않습니다.';
       }
       sdp.appendChild(sdpText);
-      root.appendChild(sdp);
+      root.appendChild(pcPanel(sdp));
       const line = (parent, text) => {
         const p = document.createElement('p');
         p.textContent = text;
