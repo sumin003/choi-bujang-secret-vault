@@ -123,6 +123,24 @@ export function createStudentView({ api } = {}) {
               : '다음 할 일: 로컬 앱 실행 상태를 확인하고 다시 조회를 직접 누르세요. 계속 실패하면 이 항목의 이유를 담당자에게 전달하세요.');
         }
         add(box, 'p', measured ? '측정 묶음 시각: ' + measured : '측정 시각: 확인 불가 — 유효한 실측 결과 없음');
+        if (parent === grid && pc.status === 'ok' && !text.startsWith('확인 불가')) {
+          let percent = null;
+          if (name === 'CPU 사용률') percent = metric.usagePercent;
+          if (name === '메모리 사용량') percent = 100 * metric.usedBytes / metric.totalBytes;
+          if (name === '디스크 남은 공간') percent = 100 * metric.freeBytes / metric.totalBytes;
+          if (Number.isFinite(percent) && percent >= 0 && percent <= 100) {
+            const meter = document.createElement('meter');
+            meter.min = 0;
+            meter.max = 100;
+            meter.value = percent;
+            meter.style.width = '100%';
+            meter.style.height = '22px';
+            meter.setAttribute('aria-label', name + (name === '디스크 남은 공간' ? ' · 여유 비율' : ' · 사용률'));
+            meter.textContent = percent.toFixed(1) + ' %';
+            box.appendChild(meter);
+            if (name === '디스크 남은 공간') add(box, 'p', '여유 비율: ' + percent.toFixed(1) + ' %');
+          }
+        }
       };
       card('CPU 사용률', d?.metrics.cpu, m =>
         finite(m.usagePercent) && m.usagePercent <= 100
@@ -164,8 +182,12 @@ export function createStudentView({ api } = {}) {
           }
           add(trends, 'p', comparison);
           const graph = document.createElement('div');
-          graph.style.display = 'flex';
-          graph.style.alignItems = 'stretch';
+          graph.style.display = 'grid';
+          graph.style.gridTemplateColumns = 'repeat(' + pcHistory.length + ', 96px)';
+          graph.style.alignItems = 'end';
+          graph.style.boxSizing = 'border-box';
+          graph.style.width = '100%';
+          graph.style.maxWidth = '100%';
           graph.style.gap = '8px';
           graph.style.overflowX = 'auto';
           graph.style.padding = '8px';
@@ -178,11 +200,25 @@ export function createStudentView({ api } = {}) {
             + (key === 'memory' ? ' · 보관된 값에 따라 범위가 바뀝니다.' : ''));
           pcHistory.forEach((entry, index) => {
             const column = document.createElement('div');
-            column.style.flex = '0 0 86px';
+            column.style.display = 'grid';
+            column.style.gridTemplateRows = '44px 100px 38px';
+            column.style.gap = '6px';
+            column.style.minWidth = '0';
+            column.style.margin = '0';
+            column.style.padding = '0';
+            column.style.boxSizing = 'border-box';
             graph.appendChild(column);
-            add(column, 'p', String(index + 1) + '회 · ' + (entry[key].value === null ? '확인 불가' : format(entry, key)));
+            const valueLabel = add(column, 'p', String(index + 1) + '회 · ' + (entry[key].value === null ? '확인 불가' : format(entry, key)));
+            valueLabel.style.margin = '0';
+            valueLabel.style.fontSize = '0.85em';
+            valueLabel.style.lineHeight = '1.4';
             const track = document.createElement('div');
             track.style.height = '100px';
+            track.style.minHeight = '100px';
+            track.style.maxHeight = '100px';
+            track.style.margin = '0';
+            track.style.padding = '0';
+            track.style.boxSizing = 'border-box';
             track.style.display = 'flex';
             track.style.alignItems = 'flex-end';
             track.style.borderBottom = '1px solid currentColor';
@@ -190,12 +226,22 @@ export function createStudentView({ api } = {}) {
             if (entry[key].value !== null) {
               const bar = document.createElement('div');
               bar.style.height = (100 * entry[key].value / scale) + '%';
-              bar.style.width = '100%';
+              bar.style.width = '36px';
+              bar.style.maxHeight = '100%';
+              bar.style.margin = '0 auto';
+              bar.style.padding = '0';
               bar.style.backgroundColor = 'currentColor';
               bar.setAttribute('aria-hidden', 'true');
               track.appendChild(bar);
             } else add(track, 'span', '—');
-            add(column, 'p', stamp(entry));
+            const when = new Date(entry.measuredAt || entry.receivedAt).toLocaleTimeString('ko-KR', {
+              timeZone: 'Asia/Seoul', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+            const timeLabel = add(column, 'p', (entry.measuredAt ? '' : '실패 수신 ') + when);
+            timeLabel.style.margin = '0';
+            timeLabel.style.fontSize = '0.8em';
+            timeLabel.style.lineHeight = '1.4';
+            column.setAttribute('aria-label', format(entry, key) + ' · ' + stamp(entry));
           });
         }
       }
@@ -208,6 +254,8 @@ export function createStudentView({ api } = {}) {
         trends.appendChild(wrap);
         const table = document.createElement('table');
         wrap.appendChild(table);
+        table.style.width = '100%';
+        table.style.borderCollapse = 'collapse';
         add(table, 'caption', '최근 측정 기록 · 과거 값이며 현재 상태를 보장하지 않습니다');
         const head = document.createElement('thead');
         table.appendChild(head);
@@ -222,7 +270,12 @@ export function createStudentView({ api } = {}) {
         pcHistory.forEach((entry, index) => {
           const row = document.createElement('tr');
           body.appendChild(row);
-          for (const text of [String(index + 1), stamp(entry), format(entry, 'cpu'), format(entry, 'memory')]) add(row, 'td', text);
+          for (const text of [String(index + 1), stamp(entry), format(entry, 'cpu'), format(entry, 'memory')]) {
+            const cell = add(row, 'td', text);
+            cell.style.padding = '8px';
+            cell.style.borderBottom = '1px solid currentColor';
+            cell.style.textAlign = 'left';
+          }
         });
       }
       add(trends, 'p', '실패 구간은 보간하거나 정상 값으로 바꾸지 않습니다. 수치 변화만으로 침해·공격 또는 안전 여부를 판단하지 않습니다.');
