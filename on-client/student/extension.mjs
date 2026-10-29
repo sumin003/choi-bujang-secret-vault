@@ -22,18 +22,38 @@ export function createStudentView({ api } = {}) {
     };
     const finite = n => typeof n === 'number' && Number.isFinite(n) && n >= 0;
     const gib = n => (n / 1024 ** 3).toFixed(2) + ' GiB';
+    const button = document.createElement('button');
+    let buttonBound = false;
     const paint = () => {
+      const restoreFocus = document.activeElement === button;
       root.replaceChildren();
       root.style.lineHeight = '1.6';
       add(root, 'h3', '케셰브 · 내 PC 실측');
       add(root, 'p', '제공된 로컬 PC 측정 기능을 사용합니다. 예시 값은 표시하지 않습니다. 보안 서버·AI 연결 상태와 별개입니다.');
-      const button = add(root, 'button', pc.status === 'loading' ? 'PC 상태 측정 중' : 'PC 상태 새로 측정');
+      add(root, 'h4', '핵심 기능 3가지');
+      const overview = document.createElement('ol');
+      add(overview, 'li', '내 PC 실측 — 아래 상태 카드 네 개에서 값·단위·측정 시각을 확인합니다.');
+      add(overview, 'li', '연결과 기록 — 아래 요약에서 네트워크·Windows 기록·SDP 상태를 구분합니다.');
+      add(overview, 'li', '보안 기록 상세 — 제공 보안 기록 메뉴에서 기존 필터와 상세 버튼으로 근거·규칙을 확인합니다.');
+      root.appendChild(overview);
+      button.textContent = pc.status === 'loading' ? '조회 중…' : '다시 조회';
+      root.appendChild(button);
+      root.setAttribute('aria-busy', String(pc.status === 'loading'));
+      button.setAttribute('aria-disabled', String(pc.status === 'loading'));
+      const progress = add(root, 'p', pc.status === 'loading'
+        ? 'PC 상태 조회 중입니다. 요청이 끝날 때까지 기다려 주세요.'
+        : pc.status === 'error' ? 'PC 상태 조회 실패. 로컬 앱 서버 실행을 확인한 뒤 다시 조회를 직접 누르세요.'
+        : pc.status === 'ok' ? 'PC 조회 응답을 받았습니다. 각 항목의 측정 결과 또는 확인 불가 이유를 확인하세요.'
+        : '아직 조회하지 않았습니다. 다시 조회를 눌러 실제 PC 상태를 확인하세요.');
+      progress.setAttribute('role', 'status');
+      progress.setAttribute('aria-live', 'polite');
+      progress.setAttribute('aria-atomic', 'true');
       button.type = 'button';
       button.style.padding = '10px 16px';
       button.style.marginBottom = '16px';
       button.style.borderRadius = '8px';
-      button.disabled = pc.status === 'loading' || typeof api?.get !== 'function';
-      button.addEventListener('click', async () => {
+      button.disabled = typeof api?.get !== 'function';
+      if (!buttonBound) button.addEventListener('click', async () => {
         if (pc.status === 'loading') return;
         pc = { status: 'loading' };
         paint();
@@ -50,8 +70,8 @@ export function createStudentView({ api } = {}) {
           pc = { status: 'error', reason: '로컬 앱 서버에 연결하거나 측정 결과를 읽을 수 없습니다' };
         }
         paint();
-        root.querySelector('button')?.focus();
       });
+      buttonBound = true;
       const grid = document.createElement('div');
       grid.style.display = 'grid';
       grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(180px, 1fr))';
@@ -76,6 +96,13 @@ export function createStudentView({ api } = {}) {
         else if (metric?.state !== 'ok') text = '확인 불가 — ' + (reasons[metric?.reason] || '읽을 수 있는 측정 결과가 없습니다');
         else text = describe(metric) || '확인 불가 — 측정 값의 형식 또는 범위가 올바르지 않습니다';
         add(box, 'p', text);
+        if (pc.status === 'error' || pc.status === 'ok' && text.startsWith('확인 불가')) {
+          add(box, 'p', metric?.reason === 'permission_denied'
+            ? '다음 할 일: 현재 일반 권한에서는 확인할 수 없습니다. 권한이나 보안 설정을 변경하지 마세요.'
+            : metric?.reason === 'unsupported'
+              ? '다음 할 일: 이 환경의 지원 범위를 확인하세요. 예시 값으로 대체하지 않습니다.'
+              : '다음 할 일: 로컬 앱 실행 상태를 확인하고 다시 조회를 직접 누르세요. 계속 실패하면 이 항목의 이유를 담당자에게 전달하세요.');
+        }
         add(box, 'p', measured ? '측정 묶음 시각: ' + measured : '측정 시각: 확인 불가 — 유효한 실측 결과 없음');
       };
       card('CPU 사용률', d?.metrics.cpu, m =>
@@ -114,7 +141,7 @@ export function createStudentView({ api } = {}) {
         box.children[0].style.flex = '1 1 160px';
         box.children[1].style.flex = '2 1 260px';
         box.children[1].style.fontWeight = '600';
-        box.children[2].style.flex = '1 0 100%';
+        box.children[box.children.length - 1].style.flex = '1 0 100%';
         box.children[2].style.fontSize = '0.85em';
         box.children[2].style.margin = '0';
       };
@@ -159,7 +186,8 @@ export function createStudentView({ api } = {}) {
       add(details, 'p', '메모리는 이 PC 전체의 사용량이며 케셰브 앱만의 사용량이 아닙니다. GiB는 1,073,741,824바이트입니다.');
       add(details, 'p', '디스크는 로컬 앱 서버의 프로젝트가 있는 파일시스템의 남은 공간입니다. 모든 드라이브의 합계가 아닙니다.');
       add(details, 'p', '측정 묶음 시각은 제공 API가 전체 조회를 마친 시각입니다. 각 항목을 정확히 동시에 측정했다는 뜻은 아닙니다. 자동 재측정과 관리자 권한 요청은 하지 않습니다.');
-      if (typeof api?.get !== 'function') add(root, 'p', '확인 불가 — 제공 PC 조회 API가 연결되지 않았습니다.');
+      if (typeof api?.get !== 'function') add(root, 'p', '확인 불가 — 제공 PC 조회 API가 연결되지 않았습니다. 제공 실행 도구로 앱을 실행했는지 확인하세요.');
+      if (restoreFocus) button.focus();
     };
     paint();
     return root;
