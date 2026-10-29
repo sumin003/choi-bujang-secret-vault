@@ -57,12 +57,12 @@ export function createStudentView({ api } = {}) {
       const measured = d ? new Date(d.measuredAt).toLocaleString('ko-KR', {
         timeZone: 'Asia/Seoul', hour12: false
       }) + ' (한국 시각) · ' + d.measuredAt : null;
-      const card = (name, metric, describe) => {
+      const card = (name, metric, describe, parent = grid) => {
         const box = document.createElement('section');
         box.style.border = '1px solid currentColor';
         box.style.borderRadius = '12px';
         box.style.padding = '12px';
-        grid.appendChild(box);
+        parent.appendChild(box);
         add(box, 'h4', name);
         let text;
         if (pc.status === 'idle') text = '확인 불가 — 아직 측정하지 않았습니다';
@@ -86,6 +86,25 @@ export function createStudentView({ api } = {}) {
         Array.isArray(m.profiles) && m.profiles.length === 3
           && ['Domain', 'Private', 'Public'].every(name => m.profiles.some(p => p.name === name && typeof p.enabled === 'boolean'))
           ? m.profiles.map(p => p.name + ': ' + (p.enabled ? '켜짐' : '꺼짐')).join(' · ') + ' · 단위: 해당 없음' : null);
+      add(root, 'h4', '네트워크 구성 · Windows 기록');
+      card('네트워크 구성', d?.metrics.network, m =>
+        Number.isSafeInteger(m.interfaceCount) && m.interfaceCount >= 0
+          && Number.isSafeInteger(m.ipv4Count) && m.ipv4Count >= 0
+          ? '비내부 네트워크 인터페이스: ' + m.interfaceCount + ' 개 · IPv4 주소: ' + m.ipv4Count + ' 개'
+          : null, root);
+      add(root, 'p', '제공 API는 비내부 인터페이스와 IPv4 주소 개수만 전달합니다. 인터넷 접속 가능 여부·IP 주소·게이트웨이·DNS·연결 속도는 확인 불가 — 이 조회에는 해당 정보가 없습니다.');
+      card('최근 Windows 기록 · System·Application 합산', d?.metrics.events, m =>
+        Number.isSafeInteger(m.warningCount) && m.warningCount >= 0
+          && Number.isSafeInteger(m.errorCount) && m.errorCount >= 0
+          && m.warningCount + m.errorCount <= 5000 && m.sampleLimit === 5000
+          && typeof m.truncated === 'boolean' && typeof m.since === 'string' && Number.isFinite(Date.parse(m.since))
+          ? '경고: ' + m.warningCount + ' 건 · 오류: ' + m.errorCount + ' 건 · 조회 시작: ' + m.since
+            + ' · 조회 끝: ' + d.measuredAt + ' · 최근 약 24시간 · 최대 ' + m.sampleLimit + ' 건'
+            + (m.truncated ? ' · 생략 있음: 최신 5,000건의 집계이며 전체 건수가 아닙니다.'
+              : ' · 생략 없음')
+          : null, root);
+      add(root, 'p', '이 건수는 침해나 공격 탐지 결과가 아닙니다. System·Application 경고·오류를 합산한 값이며 로그별 건수와 원문은 이 API에 없습니다.');
+      add(root, 'p', '방화벽은 위 카드의 프로필 켜짐·꺼짐만 읽습니다. 개별 허용·차단 규칙은 확인 불가 — 제공 API의 조회 범위 밖입니다. 권한이 부족해도 관리자 권한을 요청하거나 설정을 변경하지 않습니다.');
       add(root, 'h4', '측정 결과 읽는 법');
       add(root, 'p', 'CPU는 짧은 표본 구간의 사용률입니다. 작업 관리자와 비교할 때 측정 시점과 집계 구간이 다르면 값이 다를 수 있습니다.');
       add(root, 'p', '메모리는 이 PC 전체의 사용량이며 케셰브 앱만의 사용량이 아닙니다. GiB는 1,073,741,824바이트입니다.');
@@ -397,6 +416,27 @@ export function createStudentView({ api } = {}) {
     renderStatus({ devices, sessions, notifications, diagnostics, mode }) {
       const root = document.createElement('div');
       root.appendChild(pcPanel());
+      // PC 조회 응답의 meta는 SDP 연결 근거로 사용하지 않는다.
+      const sdp = document.createElement('section');
+      const sdpTitle = document.createElement('h3');
+      sdpTitle.textContent = 'SDP 서버 연결 상태 · PC 실측과 별도';
+      sdp.appendChild(sdpTitle);
+      const sdpText = document.createElement('p');
+      const resources = [devices, sessions];
+      if (resources.every(r => r?.status === 'error' && r.mode === 'disconnected'
+        && r.error?.code === 'ENGINE_NOT_CONNECTED')) {
+        sdpText.textContent = 'SDP 미연결 — 제공 서버가 기기·세션 조회에서 ENGINE_NOT_CONNECTED를 전달했습니다.';
+      } else if (resources.every(r => r?.status === 'ok' && r.mode === 'connected')) {
+        sdpText.textContent = 'SDP 연결됨 — 현재 제공된 기기·세션 조회가 connected로 확인됐습니다. PC 조회 성공과는 별도입니다.';
+      } else if (resources.some(r => r?.mode === 'demo')) {
+        sdpText.textContent = 'SDP 연결 확인 불가 — 예제 자료(demo)는 실제 SDP 연결을 증명하지 않습니다.';
+      } else if (resources.some(r => r?.status === 'loading')) {
+        sdpText.textContent = 'SDP 연결 확인 불가 — 기기·세션 조회 중입니다. 미연결로 단정하지 않습니다.';
+      } else {
+        sdpText.textContent = 'SDP 연결 확인 불가 — 현재 기기·세션 응답만으로 연결 여부를 확인할 수 없습니다. 통신 실패·인증 오류·응답 불일치를 미연결로 단정하지 않습니다.';
+      }
+      sdp.appendChild(sdpText);
+      root.appendChild(sdp);
       const line = (parent, text) => {
         const p = document.createElement('p');
         p.textContent = text;
