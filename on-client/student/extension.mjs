@@ -167,8 +167,20 @@ export function createStudentView({ api } = {}) {
         : entry[key].value.toFixed(key === 'cpu' ? 1 : 2) + (key === 'cpu' ? ' %' : ' GiB');
       const stamp = entry => entry.measuredAt ? '측정 묶음 시각: ' + entry.measuredAt
         : '측정 시각: 확인 불가 · 요청 결과 수신 시각: ' + entry.receivedAt;
-      for (const [key, title, unit] of [['cpu', 'CPU 사용률', '%'], ['memory', '메모리 사용량', 'GiB']]) {
-        add(trends, 'h4', title + ' 추이 · 단위 ' + unit);
+      if (pcHistory.length === 1) add(trends, 'p', '비교할 이전 측정 없음 · 두 번 이상 조회하면 추이가 표시됩니다.');
+      const plots = document.createElement('div');
+      plots.style.display = 'grid';
+      plots.style.gridTemplateColumns = 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))';
+      plots.style.gap = '12px';
+      trends.appendChild(plots);
+      for (const [key, title, unit] of (pcHistory.length >= 2 ? [['cpu', 'CPU 사용률', '%'], ['memory', '메모리 사용량', 'GiB']] : [])) {
+        const plot = document.createElement('section');
+        plot.style.minWidth = '0';
+        plot.style.padding = '12px';
+        plot.style.border = '1px solid currentColor';
+        plot.style.borderRadius = '10px';
+        plots.appendChild(plot);
+        add(plot, 'h4', title + ' 추이 · 단위 ' + unit);
         if (pcHistory.length > 0) {
           const latest = pcHistory[pcHistory.length - 1];
           const previous = pcHistory[pcHistory.length - 2];
@@ -180,7 +192,7 @@ export function createStudentView({ api } = {}) {
                 + (latest[key].value - previous[key].value).toFixed(key === 'cpu' ? 1 : 2)
                 + (key === 'cpu' ? ' %p' : ' GiB');
           }
-          add(trends, 'p', comparison);
+          add(plot, 'p', comparison);
           const graph = document.createElement('div');
           graph.style.display = 'grid';
           graph.style.gridTemplateColumns = 'repeat(' + pcHistory.length + ', 96px)';
@@ -194,14 +206,14 @@ export function createStudentView({ api } = {}) {
           graph.tabIndex = 0;
           graph.setAttribute('role', 'group');
           graph.setAttribute('aria-label', title + ' 조회 순서별 막대그래프. 같은 값과 시각은 아래 표에서도 확인할 수 있습니다.');
-          trends.appendChild(graph);
+          plot.appendChild(graph);
           const scale = key === 'cpu' ? 100 : Math.max(1, ...pcHistory.map(e => e[key].value || 0));
-          add(trends, 'p', '세로 범위: 0~' + scale.toFixed(key === 'cpu' ? 0 : 2) + ' ' + unit
+          add(plot, 'p', '세로 범위: 0~' + scale.toFixed(key === 'cpu' ? 0 : 2) + ' ' + unit
             + (key === 'memory' ? ' · 보관된 값에 따라 범위가 바뀝니다.' : ''));
           pcHistory.forEach((entry, index) => {
             const column = document.createElement('div');
             column.style.display = 'grid';
-            column.style.gridTemplateRows = '44px 100px 38px';
+            column.style.gridTemplateRows = '36px 72px 30px';
             column.style.gap = '6px';
             column.style.minWidth = '0';
             column.style.margin = '0';
@@ -213,9 +225,9 @@ export function createStudentView({ api } = {}) {
             valueLabel.style.fontSize = '0.85em';
             valueLabel.style.lineHeight = '1.4';
             const track = document.createElement('div');
-            track.style.height = '100px';
-            track.style.minHeight = '100px';
-            track.style.maxHeight = '100px';
+            track.style.height = '72px';
+            track.style.minHeight = '72px';
+            track.style.maxHeight = '72px';
             track.style.margin = '0';
             track.style.padding = '0';
             track.style.boxSizing = 'border-box';
@@ -246,12 +258,15 @@ export function createStudentView({ api } = {}) {
         }
       }
       if (pcHistory.length) {
+        const records = document.createElement('details');
+        add(records, 'summary', '측정 기록 보기 (' + pcHistory.length + '회)');
+        trends.appendChild(records);
         const wrap = document.createElement('div');
         wrap.style.overflowX = 'auto';
         wrap.tabIndex = 0;
         wrap.setAttribute('role', 'region');
         wrap.setAttribute('aria-label', '실측 기록 표. 가로로 스크롤할 수 있습니다.');
-        trends.appendChild(wrap);
+        records.appendChild(wrap);
         const table = document.createElement('table');
         wrap.appendChild(table);
         table.style.width = '100%';
